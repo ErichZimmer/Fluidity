@@ -76,25 +76,20 @@ class image_temporal_filters(AddIn):
 
         'background_type':
             [2420, 'sub', 'temporal minimum', (
-                #'lowpass',
-                'temporal maximum',
-                'temporal mean', 
                 'temporal minimum',
+                'temporal mean', 
+                'temporal maximum',
             ),
             'operation',
             'The algorithm used to generate the background which '+
             'is typically subtracted from the piv images. '
             ],
 
-        'starting_frame':
-            [2431, 'sub_int', 0, None,
-            'starting frame',
-            'Defining the starting frame of the background subtraction.'],
-
-        'ending_frame':
-            [2432, 'sub_int', -1, None,
-            'ending frame',
-            'Defining the ending frame of the background subtraction.'],
+        'background_selection':
+            [2425, 'sub', '0:-1', None,
+            'selected frames',
+            'Select specific frames. Acceptable inputs: 0, 0:-1, 0:-1:2. '+
+            '-1 targets ending frane.'],
 
         'background_apply_type':
             [2433, 'sub', 'subtract', (
@@ -159,15 +154,6 @@ class image_temporal_filters(AddIn):
                     background = np.min(np.array([background, image]), axis=0)
             return convert(background)
 
-        elif method == 'temporal maximum':
-            for img in image_list:
-                if img == image_list[0]:
-                    background = convert(imread(img))
-                else:
-                    image = convert(imread(img))
-                    background = np.max(np.array([background, image]), axis=0)
-            return background
-
         elif method == 'temporal mean':
             for img in image_list:
                 if img == image_list[0]:
@@ -176,19 +162,16 @@ class image_temporal_filters(AddIn):
                 else:
                     image = convert(imread(img))
                     background = np.sum(np.array([background, image]), axis=0)
-            return (background / len(image_list)).astype(dtype) 
-
-        elif method == 'lowpass':
+            return (background / len(image_list)).astype(dtype)
+        
+        elif method == 'temporal maximum':
             for img in image_list:
                 if img == image_list[0]:
-                    img = convert(imread(img))
-                    dtype = img.dtype
-                    background = gaussian_filter(img, sigma = sigma)
+                    background = convert(imread(img))
                 else:
-                    img = convert(imread(img))
-                    background += gaussian_filter(img, sigma = sigma)
-            return (background / len(image_list)).astype(dtype) 
-
+                    image = convert(imread(img))
+                    background = np.max(np.array([background, image]), axis=0)
+            return background 
         else:
             print('Background generation algorithm not implemented')
         

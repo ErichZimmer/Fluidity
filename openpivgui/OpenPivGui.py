@@ -21,10 +21,9 @@ from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg,
     NavigationToolbar2Tk)
 from matplotlib.widgets import RectangleSelector, PolygonSelector, LassoSelector, Cursor
-from multiprocessing import Manager
+from tifffile import imsave as _imsave
+from imageio import get_reader, get_writer, imread
 from pkg_resources import get_distribution
-from functools import reduce
-from operator import or_
 from scipy.signal import get_window
 from ast import literal_eval
 import matplotlib.pyplot as plt
@@ -336,6 +335,7 @@ class OpenPivGui(tk.Tk):
                     frame.attrs['scale_dist'] = 1
                     frame.attrs['scale_vel']  = 1
                     frame.attrs['units']      = ['px', 'dt']
+                    frame.attrs['origin']     = 'top-left'
 
                 if 'x' in frame: del frame['x']
                 if 'y' in frame: del frame['y']
@@ -366,6 +366,7 @@ class OpenPivGui(tk.Tk):
 
             else: # batch processing
                 if self.p['ensemble_correlation'] != True:
+                    self.ttk_widgets['clear_results'].config(state = 'disabled')
                     self.process_type.config(text = ('Processing {} frames(s)'.format(
                         len(self.p['files_a']))))
 
@@ -377,8 +378,8 @@ class OpenPivGui(tk.Tk):
                             mask
                         ]
                     print('Created settings dictionary for all frames')
-                    self.ttk_widgets['clear_results'].config(state = 'disabled')
-                    mp = MultiProcessing(
+                    #self.ttk_widgets['clear_results'].config(state = 'disabled')
+                    self.mp = MultiProcessing(
                         self, 
                         files_a = self.p['files_a'],
                         files_b = self.p['files_b'],
@@ -390,8 +391,9 @@ class OpenPivGui(tk.Tk):
                     )
 
                     start = time.time()
-                    mp.run(func = mp.process, n_cpus = cpu_count)
+                    self.mp.run(func = self.mp.process, n_cpus = cpu_count)
                     print(f'Finished processing ({time.time() - start} s)')
+                    
                     self.ttk_widgets['clear_results'].config(state = 'normal')
                     for i in range(len(self.p['files_a'])):
                         if self.p['analysis'] == False:
@@ -419,7 +421,7 @@ class OpenPivGui(tk.Tk):
                             frame.attrs['scale_dist'] = 1
                             frame.attrs['scale_vel']  = 1
                             frame.attrs['units']      = ['px', 'dt']
-
+                            frame.attrs['origin']     = 'top-left'
 
                         if 'x' in frame: del frame['x']
                         if 'y' in frame: del frame['y']
@@ -497,6 +499,7 @@ class OpenPivGui(tk.Tk):
                         frame.attrs['scale_dist'] = 1
                         frame.attrs['scale_vel']  = 1
                         frame.attrs['units']      = ['px', 'dt']
+                        frame.attrs['origin']     = 'top-left'
 
                     if 'x' in frame: del frame['x']
                     if 'y' in frame: del frame['y']
@@ -578,20 +581,25 @@ class OpenPivGui(tk.Tk):
             
     def validate_results(self, index):
         self.get_settings()
+        self.progressbar.start()
         try:
             self.disable_widgets()
-            
-            if index != None: frame_len = 1
-            else: 
-                n = 0
-                if 'average' in self.session['results']:
-                    n += 1
-                if 'ensemble' in self.session['results']:
-                    n += 1
-                frame_len = len(self.p['fnames']) - n
+            if index != None:
+                frame_len = 1
+                self.progressbar.start()
+            else:
+                frame_len = len(self.p['files_a'])
+                self.progressbar.config(
+                    mode = 'determinate', 
+                    maximum = frame_len,
+                    value = 0
+                )
             
             for i in range(frame_len):
-                if index != None: i = index
+                if index != None: 
+                    i = index
+                else:
+                    self.progressbar['value'] = i
                 print(f'Validating frame {i}')
                 self.process_type.config(text = f'Validating frame {i}')
                 frame = self.session['results'][f'frame_{i}']
@@ -642,7 +650,15 @@ class OpenPivGui(tk.Tk):
                 self.process_type.config(text = f'Validated frame {i}')
         except Exception as e:
             print('Could not finish validating results\nReason: ' + str(e))
+            
         self.enable_widgets()
+        if index != None:
+            self.progressbar.stop()
+        else:
+            self.progressbar.config(
+                mode = 'indeterminate', 
+            )
+        self.progressbar['value'] = 0
      
 
     def start_modifications(self, index = None):
@@ -667,21 +683,26 @@ class OpenPivGui(tk.Tk):
             
     def modify_results(self, index):
         self.get_settings()
+        
         try:
             self.disable_widgets()
             if index != None:
                 frame_len = 1
+                self.progressbar.start()
             else:
-                n = 0
-                if 'average' in self.session['results']:
-                    n += 1
-                if 'ensemble' in self.session['results']:
-                    n += 1
-                frame_len = len(self.p['fnames']) - n
+                frame_len = len(self.p['files_a'])
+                self.progressbar.config(
+                    mode = 'determinate', 
+                    maximum = frame_len,
+                    value = 0
+                )
             
             for i in range(frame_len):
                 remove = 0
-                if index != None: i = index
+                if index != None: 
+                    i = index
+                else:
+                    self.progressbar['value'] = i
                 print(f'Modifying frame {i}')
                 self.process_type.config(text = f'Modifying frame {i}')
                 frame = self.session['results'][f'frame_{i}']
@@ -732,6 +753,13 @@ class OpenPivGui(tk.Tk):
         except Exception as e:
             print('Could not finish modifying results\nReason: ' + str(e))
         self.enable_widgets()
+        if index != None:
+            self.progressbar.stop()
+        else:
+            self.progressbar.config(
+                mode = 'indeterminate', 
+            )
+        self.progressbar['value'] = 0
         
         
     def average_results(self):
@@ -743,7 +771,7 @@ class OpenPivGui(tk.Tk):
         )
         if start_processing != True:
             raise Exception('Terminated process')
-            
+        
         #self.disable_widgets()
         #try:
         if 1 == 1:
@@ -811,6 +839,7 @@ class OpenPivGui(tk.Tk):
             frame.attrs['scale_dist'] = self.session['results']['frame_0'].attrs['scale_dist']
             frame.attrs['scale_vel']  = self.session['results']['frame_0'].attrs['scale_vel']
             frame.attrs['units']      = self.session['results']['frame_0'].attrs['units']
+            frame.attrs['origin']     = self.session['results']['frame_0'].attrs['origin']
             
             flag = np.zeros_like(x)
             s2n = np.zeros_like(x)
@@ -1123,11 +1152,11 @@ class OpenPivGui(tk.Tk):
         submenu = tk.Menu(options, tearoff=0)
         submenu.add_command(label='settings', command = lambda: self.p.dump_settings(
             filedialog.asksaveasfilename(
-                title = 'Settings Manager',
+                title = 'Save current settings',
                 defaultextension = '.json',
                 filetypes = [('json', '*.json'), ]
             )))
-        submenu.add_command(label='current figure', command = lambda: self.selection(25))
+        submenu.add_command(label='main figure', command = lambda: self.selection(25))
         submenu.add_command(label='pre-processed images', command = lambda: self.selection(27))
         submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(26))
         #submenu.add_command(label='TecPlot')
@@ -1139,7 +1168,12 @@ class OpenPivGui(tk.Tk):
         submenu.add_command(label='session', command = self.reset_session)
         options.add_cascade(label='Reset', menu=submenu)
         options.add_separator()
-
+        submenu = tk.Menu(options, tearoff=0)
+        submenu.add_command(label='images to movie', command = lambda: self.selection(28))
+        submenu.add_command(label='movie to images', command = lambda: self.selection(29))
+        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(30))
+        options.add_cascade(label='Convert', menu=submenu)
+        options.add_separator()
         options.add_command(label='Exit', command=self.destroy)
         files.pack(side='left', fill='x')
         
@@ -1304,7 +1338,7 @@ class OpenPivGui(tk.Tk):
         '''Reset parameters to default values.'''
         if do_menu:
             answer = messagebox.askyesno(
-                title='Settings Manager',
+                title='Reset settings',
                 message='Reset all parameters to default values?')
         else:
             answer = True
@@ -1331,7 +1365,7 @@ class OpenPivGui(tk.Tk):
     def reset_session(self):
         '''Reset session'''
         answer = messagebox.askyesno(
-            title='Session Manager',
+            title='Reset session',
             message='Reset/delete current session?')
         
         if answer == True:
@@ -1356,7 +1390,7 @@ class OpenPivGui(tk.Tk):
     def load_settings(self):
         '''Load settings from a JSON file.'''
         settings = filedialog.askopenfilename(
-            title = 'Settings Manager',
+            title = 'Load settings',
             defaultextension = '.json',
             filetypes = [('json', '*.json'), ])
         if len(settings) > 0:
@@ -1368,6 +1402,73 @@ class OpenPivGui(tk.Tk):
                 self.ttk_widgets[widget].config(state = 'disabled')  
     
     
+    def images_to_movie(self):
+        files = filedialog.askopenfilenames(
+            multiple=True,
+            filetypes = (
+                (".png","*.png"),
+                (".jpeg","*.jpeg"),
+            )
+        )
+        if len(files) > 0:
+            print('Saving files to movie')
+            if self.p['export4_sort'] == True:
+                files = sorted(files)
+            fname = files[0].split('/')[-1]
+            pathfile = files[0][:-len(fname)]
+            outpath = (
+                pathfile + 
+                self.p['export4_fname'] + '.' + self.p['export4_ext']
+            )
+            writer = get_writer(outpath, fps = self.p['export4_fps'])
+            ind = 0
+            for file in files:
+                img = imread(file)
+                #img = img.astype('float32')
+                #img /= img.max()
+                #img *= 255
+                #img = img.astype('uint8')
+                #if img.shape[0] % 2 > 0:
+                #    img = img[:-1,:]
+                #if img.shape[1] % 2 > 0:
+                #    img = img[:,:-1]
+                writer.append_data(img)
+                print(f'Appended frame {ind}')
+                ind += 1
+            print('Closing writer')
+            writer.close()
+            print('Saved file path: ' + outpath)
+    
+    
+    def movie_to_images(self):
+        dirr = filedialog.askopenfilenames(
+            multiple=False,
+            filetypes = (
+                (".mp4","*.mp4"),
+                (".avi","*.avi"),
+                (".gif","*.gif"),
+            )
+        )
+        if len(dirr) > 0:
+            print('Splitting movie to images')
+            fname = dirr[0].split('/')[-1]
+            pathfile = dirr[0][:-len(fname)]
+            movie = get_reader(dirr[0])
+            
+            for ind, img in enumerate(movie):
+                outpath = (
+                    pathfile + 
+                    self.p['export5_fname'].format(ind) + '.' + self.p['export5_ext']
+                )
+                img = img.astype('float32')
+                img /= img.max()
+                img *= 255
+                img = img.astype('uint8')
+                piv_tls.imsave(outpath, img)
+            
+            print('Saved file path: ' + pathfile)
+        
+        
     '''~~~~~~~~~~~~~~~~~~~~~~~listbox~~~~~~~~~~~~~~~~~~~~~~~'''
     def __init_listbox(self, key): # A bug occurs when separating the two listboxes. Why?
         '''Creates an interactive list of filenames.
@@ -1994,28 +2095,38 @@ class OpenPivGui(tk.Tk):
         
         
     def roi_border_colorpicker(self):
-        self.p['roi_border'] = colorchooser.askcolor()[1]
-        self.ttk_widgets['roi_border'].config(bg=self.p['roi_border'])
+        color = colorchooser.askcolor()[1]
+        if color != None:
+            self.p['roi_border'] = color
+            self.ttk_widgets['roi_border'].config(bg=self.p['roi_border'])
         
         
     def mask_fill_colorpicker(self):
-        self.p['mask_fill'] = colorchooser.askcolor()[1]
-        self.ttk_widgets['mask_fill'].config(bg=self.p['mask_fill'])
+        color = colorchooser.askcolor()[1]
+        if color != None:
+            self.p['mask_fill'] = color
+            self.ttk_widgets['mask_fill'].config(bg=self.p['mask_fill'])
         
         
     def mask_vec_colorpicker(self):
-        self.p['mask_vec'] = colorchooser.askcolor()[1]
-        self.mask_vec_color.config(bg=self.p['mask_vec'])
+        color = colorchooser.askcolor()[1]
+        if color != None:
+            self.p['mask_vec'] = color
+            self.mask_vec_color.config(bg=self.p['mask_vec'])
         
         
     def invalid_colorpicker(self):
-        self.p['invalid_color'] = colorchooser.askcolor()[1]
-        self.invalid_color.config(bg=self.p['invalid_color'])
+        color = colorchooser.askcolor()[1]
+        if color != None:
+            self.p['invalid_color'] = color
+            self.invalid_color.config(bg=self.p['invalid_color'])
 
         
     def valid_colorpicker(self):
-        self.p['valid_color'] = colorchooser.askcolor()[1]
-        self.valid_color.config(bg=self.p['valid_color'])
+        color = colorchooser.askcolor()[1]
+        if color != None:
+            self.p['valid_color'] = color
+            self.valid_color.config(bg=self.p['valid_color'])
     
     
     
@@ -2083,25 +2194,28 @@ class OpenPivGui(tk.Tk):
             except: pass
                     
             img_grp = self.session['images']
-
-            if self.p['sequence'] == '(1+2),(1+3)':
-                self.p['files_a'] = self.p['img_list'][0]
-                self.p['files_b'] = self.p['img_list'][self.p['skip']::1]
-                # making sure files_a is the same length as files_b
-                for i in range(len(self.p['files_b'])):
-                    self.p['files_a'].append(self.p['img_list'][0])
+            if self.p['custom_sequence']:
+                self.p['files_a'] = self.p['img_list'][::self.p['stride']]
+                self.p['files_b'] = self.p['img_list'][self.p['step']::self.p['stride']]
             else:
-                if self.p['sequence'] == '(1+2),(2+3)':
-                    step = 1
+                if self.p['sequence'] == '(1+2),(1+3)':
+                    self.p['files_a'] = []
+                    self.p['files_b'] = self.p['img_list'][1::1]
+                    # making sure files_a is the same length as files_b
+                    for i in range(len(self.p['files_b'])):
+                        self.p['files_a'].append(self.p['img_list'][0])
                 else:
-                    step = 2
-                self.p['files_a'] = self.p['img_list'][0::step]
-                self.p['files_b'] = self.p['img_list'][self.p['skip']::step]
-                # making sure files_a is the same length as files_b
-                diff = len(self.p['files_a'])-len(self.p['files_b'])
-                if diff != 0:
-                    for i in range(diff):
-                        self.p['files_a'].pop(len(self.p['files_b']))
+                    if self.p['sequence'] == '(1+2),(2+3)':
+                        step = 1
+                    else:
+                        step = 2
+                    self.p['files_a'] = self.p['img_list'][0::step]
+                    self.p['files_b'] = self.p['img_list'][1::step]
+            # making sure files_a is the same length as files_b
+            diff = len(self.p['files_a'])-len(self.p['files_b'])
+            if diff != 0:
+                for i in range(diff):
+                    self.p['files_a'].pop(len(self.p['files_b']))
 
             if 'img_list' in img_grp:
                 del img_grp['img_list']
@@ -2139,6 +2253,7 @@ class OpenPivGui(tk.Tk):
                 frame.attrs['units'] = ['px', 'dt']
                 frame.attrs['scale_dist'] = 1
                 frame.attrs['scale_vel'] = 1
+                frame.attrs['origin'] = 'top-left'
 
             if 'frames' in img_grp:
                 del img_grp['frames']
@@ -2302,8 +2417,8 @@ class OpenPivGui(tk.Tk):
                 if 'frames' in img_grp: del img_grp['frames']
                 img_grp.create_dataset('frames', data = self.p['fnames']) 
             
-            self.background_frame_a = []
-            self.background_frame_b = []
+                self.background_frame_a = []
+                self.background_frame_b = []
         
         
         
@@ -2688,13 +2803,14 @@ class OpenPivGui(tk.Tk):
             
     def load_background_img(self):
         files = filedialog.askopenfilenames(multiple=True, 
+                                            
                                             filetypes = (
+                                            (".tif","*.tif"),
                                             (".bmp","*.bmp"),
                                             (".jpeg","*.jpeg"),
                                             (".jpg","*.jpg"),
                                             (".pgm","*.pgm"),
-                                            (".png","*.png"),
-                                            (".tif","*.tif")))
+                                            (".png","*.png")))
         if len(files) == 1:
             print('Applying background image to both A and B frames')
             img = piv_tls.imread(files[0])
@@ -2724,13 +2840,20 @@ class OpenPivGui(tk.Tk):
         
     def generate_background_images(self):
         print('Generating A frames background')
+        files_a = []
+        for i in get_selection(self.p['background_selection'], len(self.p['files_a'])):
+            files_a.append(self.p['files_a'][i])
         self.background_frame_a = self.preprocessing_methods['generate_background'](
-            self.p['files_a'][self.p['starting_frame']:self.p['ending_frame']], 
+            files_a, 
             self.p['background_type']
         )
+        
         print('Generating B frames background')
+        files_b = []
+        for i in get_selection(self.p['background_selection'], len(self.p['files_b'])):
+            files_b.append(self.p['files_b'][i])
         self.background_frame_b = self.preprocessing_methods['generate_background'](
-            self.p['files_b'][self.p['starting_frame']:self.p['ending_frame']], 
+            files_b, 
             self.p['background_type'],
         )
         self.background_status_frame.config(bg = 'lime')
@@ -2754,10 +2877,7 @@ class OpenPivGui(tk.Tk):
                      vmax=background.max(),
                      vmin=background.min(),
                     )
-            ax.xaxis.set_major_formatter(plt.NullFormatter())
-            ax.yaxis.set_major_formatter(plt.NullFormatter())
-            ax.set_xticks([])
-            ax.set_yticks([])
+            ax.axis('off')
             print(f'Max background intensity (before compression): {background.max()}')
             print(f'Min background intensity (before compression): {background.max()}')
             self.fig.canvas.draw()
@@ -2770,24 +2890,23 @@ class OpenPivGui(tk.Tk):
         if len(self.background_frame_a) > 1:
             dirr = filedialog.asksaveasfilename(
                 title = 'Save background images',
-                defaultextension = '.bmp',
+                defaultextension = '.tif',
                 filetypes = [
-                    ('bmp', '*.bmp'), 
                     ('tif', '*.tif'),
                 ]
             )
             ext = dirr.split('.')[-1]
             if len(dirr) > 1:
-                print('Saving background image a')
-                piv_tls.imsave(
-                    dirr[:-len(ext)-1] + 'a' + dirr[-len(ext)-1:],
-                    self.background_frame_a
-                )
-                print('Saving background image b')
-                piv_tls.imsave(
-                    dirr[:-len(ext)-1] + 'b' + dirr[-len(ext)-1:],
-                    self.background_frame_b
-                )
+                    print('Saving background image a')
+                    _imsave(
+                        dirr[:-len(ext)-1] + 'a' + dirr[-len(ext)-1:],
+                        self.background_frame_a.astype('uint16'), 
+                    )
+                    print('Saving background image b')
+                    _imsave(
+                        dirr[:-len(ext)-1] + 'b' + dirr[-len(ext)-1:],
+                        self.background_frame_b.astype('uint16'), 
+                    )
         else:
             print("Background could not save\nReason: No background stored")
             
@@ -3182,6 +3301,7 @@ class OpenPivGui(tk.Tk):
             for i in range(len(self.p['files_a'])):
                 self.session['results'][f'frame_{i}'].attrs['scale_dist'] = self.p['scale']
                 self.session['results'][f'frame_{i}'].attrs['scale_vel'] = self.p['time_step'] * time_dt
+                self.session['results'][f'frame_{i}'].attrs['origin'] = self.p['origin']
                 self.session['results'][f'frame_{i}'].attrs['units'] = units
                 self.process_type.config(text = f'Calibrated frame {i}')
             print('Applied scaling to all frames')
@@ -3252,21 +3372,23 @@ class OpenPivGui(tk.Tk):
         self.get_settings()
         dirr = filedialog.askdirectory()
         if len(dirr) > 1:
+            started = False
             for i in range(len(self.p['fnames'])):
                 if index != None:
                     i = index
                 print(f'Saving frame {i}')
-                try:
-                    sizeX, sizeY = (
-                        int(list(self.p['export1_figsize'].split(','))[0]),
-                        int(list(self.p['export1_figsize'].split(','))[1])
-                    )
-                    fig = plt.figure(figsize = (sizeX, sizeY))
-                except: fig = plt.figure()
-                
+                if started == False:
+                    try:
+                        sizeX, sizeY = (
+                            int(list(self.p['export1_figsize'].split(','))[0]),
+                            int(list(self.p['export1_figsize'].split(','))[1])
+                        )
+                        cur_plt = plt.figure(figsize = (sizeX, sizeY))
+                    except: cur_plt = plt.figure()
                 self.show(
-                    self.p[f'files_{self.toggle}'][self.index],
-                    extFig = fig,
+                    self.p[f'files_{self.toggle}'][i],
+                    extFig = cur_plt,
+                    results = self.session['results'][f'frame_{i}'],
                     preview = self.p['export1_modified_img']
                 )
                 fname = os.path.join(
@@ -3275,15 +3397,18 @@ class OpenPivGui(tk.Tk):
                             str(i).zfill(math.ceil(math.log10(len(self.p['fnames']))))
                         ) + '.' + self.p['export1_ext']
                 )
-                #if self.p['export1_tight_layout']:
-                #    fig.tight_layout()
-                plt.savefig(
+                cur_plt.savefig(
                     fname,
                     dpi = self.p['export1_dpi'],
+                    bbox_inches = 'tight',
+                    pad_inches = 0.0,
                 )
                 print(f'Saved frame {i}')
                 if index != None:
-                        break;
+                    break;
+                else:
+                    started = True
+            print('Finised saving frame(s)')
                     
                     
     def export_asci2(self, index = None):
@@ -3406,6 +3531,13 @@ class OpenPivGui(tk.Tk):
                     print(str(e))
                     mask_coords = []
                 if len(mask_coords) > 0:
+                    try:
+                        int(roi_xmin)
+                        int(roi_ymin)
+                    except:
+                        roi_xmin = 0
+                        roi_ymin = 0
+                    
                     for i in range(len(mask_coords)):
                         temp = np.array(mask_coords[i])
                         temp[:,0] = temp[:,0] - int(roi_xmin)
@@ -3434,19 +3566,23 @@ class OpenPivGui(tk.Tk):
                         img, 
                         self.p,
                         preproc            = True,
-                        roi_xmin           = roi_xmin,
-                        roi_xmax           = roi_xmax,
-                        roi_ymin           = roi_ymin,
-                        roi_ymax           = roi_ymax,
+                )
+                
+                img = self.preprocessing_methods['apply_roi'](
+                    img,
+                    roi_xmin = roi_xmin,
+                    roi_xmax = roi_xmax,
+                    roi_ymin = roi_ymin,
+                    roi_ymax = roi_ymax,
                 )
                 
                 if len(mask_coords) >= 1:
                     print('Applying mask to image 1')
-                    img = self.preprocessing_methods['apply_mask'](img, mask_coords, self.p)
+                    img = self.preprocessing_methods['apply_mask'](img*255, mask_coords, self.p)/255
                     
                 if self.p['export3_convert_uint8'] == True:
                     img[img<0] = 0
-                    img = np.uint8(img*2**8)
+                    img = np.uint8(img*255)
                 else:
                     img[img<0] = 0
                     img = (img*maxVal).astype(original_dtype)
@@ -3482,19 +3618,23 @@ class OpenPivGui(tk.Tk):
                         img, 
                         self.p,
                         preproc            = True,
-                        roi_xmin           = roi_xmin,
-                        roi_xmax           = roi_xmax,
-                        roi_ymin           = roi_ymin,
-                        roi_ymax           = roi_ymax,
+                )
+                
+                img = self.preprocessing_methods['apply_roi'](
+                    img,
+                    roi_xmin = roi_xmin,
+                    roi_xmax = roi_xmax,
+                    roi_ymin = roi_ymin,
+                    roi_ymax = roi_ymax,
                 )
                 
                 if len(mask_coords) >= 1:
                     print('Applying mask to image 2')
-                    img = self.preprocessing_methods['apply_mask'](img, mask_coords, self.p)
+                    img = self.preprocessing_methods['apply_mask'](img*255, mask_coords, self.p) / 255
                     
                 if self.p['export3_convert_uint8'] == True:
                     img[img<0] = 0
-                    img = np.uint8(img*2**8)
+                    img = np.uint8(img*255)
                 else:
                     img[img<0] = 0
                     img = (img*maxVal).astype(original_dtype)
@@ -3808,12 +3948,14 @@ class OpenPivGui(tk.Tk):
         for i in range(len(self.p['fnames'])):
             try:
                 scale_dist = self.session['results'][f'frame_{i}'].attrs['scale_dist']
-                scale_vel = self.session['results'][f'frame_{i}'].attrs['scale_vel']
-                units = self.session['results'][f'frame_{i}'].attrs['units']
+                scale_vel  = self.session['results'][f'frame_{i}'].attrs['scale_vel']
+                units      = self.session['results'][f'frame_{i}'].attrs['units']
+                origin     = self.session['results'][f'frame_{i}'].attrs['origin']
             except: # no calibration has been applied
                 scale_dist = 1
                 scale_vel  = 1
-                units = ['px', 'dt']
+                units      = ['px', 'dt']
+                origin     = 'top-left'
             del self.session['results'][f'frame_{i}']     
             frame = self.session['results'].create_group(f'frame_{i}')
             frame.attrs['processed'] = False
@@ -4388,10 +4530,12 @@ class OpenPivGui(tk.Tk):
         self.get_settings()
         if extFig == None:
             fig = self.fig
-            fig.clear()
+            
         else:
             fig = extFig
+        fig.clear()
         ax = fig.add_axes([0,0,1,1])
+        ax.axis('off')
         #ax = fig.add_subplot(111)
         if self.rasterize:
             ax.set_rasterized(True)
@@ -4439,7 +4583,8 @@ class OpenPivGui(tk.Tk):
                 self.units      = results.attrs['units']
                 self.scale_dist = results.attrs['scale_dist']
                 self.scale_vel  = results.attrs['scale_vel']
-                    
+                origin          = results.attrs['origin']
+                
                 if roi_present:
                     if self.p['debug']:
                         print('Show: Found region of interest')
@@ -4453,6 +4598,9 @@ class OpenPivGui(tk.Tk):
                     
                 u, v = u / self.scale_vel * self.scale_dist, v /  self.scale_vel * self.scale_dist
                 
+                if origin != 'top-left':
+                    x, y, u, v = piv_tls.transform_coordinates(x,y,u,v)
+                    v *= -1
                 self.results = [
                     process_time, #processed_frame,
                     x, y, u, v,
@@ -4477,16 +4625,17 @@ class OpenPivGui(tk.Tk):
                     self.update_histogram_plt()
                 
             else:
-                roi_coords = ['', '', '', '']
+                roi_coords  = ['', '', '', '']
                 mask_coords = []
-                self.xlim = [None, None]
-                self.ylim = [None, None]
+                self.xlim   = [None, None]
+                self.ylim   = [None, None]
                 #self.units = ['px', 'dt']
-                #self.scale_dist  = 1
-                #self.scale_vel   = 1
+                #self.scale_dist = 1
+                #self.scale_vel  = 1
                 self.units      = results.attrs['units']
                 self.scale_dist = results.attrs['scale_dist']
                 self.scale_vel  = results.attrs['scale_vel']
+                origin          = results.attrs['origin']
 
             if processed_frame == True and show_results == True:
                 self.calculate_statistics(self.results)
@@ -4530,9 +4679,7 @@ class OpenPivGui(tk.Tk):
                     self.tkvars['vec_width'].set(width)
                 else:
                     width = self.p['vec_width']
-                
-                ax.xaxis.set_major_formatter(plt.NullFormatter())
-                ax.yaxis.set_major_formatter(plt.NullFormatter())
+
                 try:
                     img = self.show_img(
                         fname,
@@ -4554,19 +4701,21 @@ class OpenPivGui(tk.Tk):
                       alpha = alpha,
                       vmax=self.p['matplot_intensity_max'],
                       vmin=self.p['matplot_intensity_min'],)
-                ax.set_xticks([])
-                ax.set_yticks([])
                 ax.set_xlim([0, img.shape[1]])
                 ax.set_ylim([0, img.shape[0]])
-
-                for ax in fig.get_axes():
-                    ax.invert_yaxis()
+                
+                if origin == 'top-left':
+                    for axis in fig.get_axes():
+                        axis.invert_yaxis()
 
                 if len(mask_coords) > 0:
                     xymask = coords_to_xymask(x, y, mask_coords)
                 else:
                     xymask = np.ma.nomask
-                        
+                    
+                if origin != 'top-left':
+                    v *= -1
+                    
                 if self.p['contours_show']:
                     borders = np.min(x[0, :]), np.max(x[0, :]), np.min(y[:, 0]), np.max(y[:, 0])
                         
@@ -4593,6 +4742,9 @@ class OpenPivGui(tk.Tk):
                     )
                     if self.p['debug']:
                         print('Show: Generated streamlines')
+                
+                if origin != 'top-left':
+                    v *= -1
                     
                 add_disp_mask(
                     ax,
@@ -4603,6 +4755,7 @@ class OpenPivGui(tk.Tk):
                 )
                 if self.p['debug']:
                     print('Show: Generated mask object')
+                    
                 if self.p['vectors_show']:
                     vec_plot.vector(
                         [x, y, u, v, tp],
@@ -4674,9 +4827,11 @@ class OpenPivGui(tk.Tk):
                 show_mask = False,
                 mask_coords = []
             )
+        
         if extFig == None:
-            self.ax = ax # used for GUI interactivity
             fig.canvas.draw()
+            self.ax = ax # used for GUI interactivity
+            
 
         
     def show_img(self, 
@@ -4707,24 +4862,21 @@ class OpenPivGui(tk.Tk):
                   '\nThis may cause a loss of precision')
             
         print('Processing image')
-        #maxVal = img.max()
-        #if img.max() > 2**8:
-        #    maxVal = 2**16
-        #else:
-        #    maxVal = 2**8
         maxVal = img.max()
-        img = img.astype(np.float32) # minimize compression loss
+        img = img.astype('float32') # minimize compression loss
         img /= maxVal
         if len(self.background_frame_a) > 1:
             if self.toggle == 'a':
-                bg = self.background_frame_a
+                bg = self.background_frame_a / maxVal
             else:
-                bg = self.background_frame_b
-            img = self.preprocessing_methods['temporal_filters'](img, bg/maxVal, self.p)
+                bg = self.background_frame_b / maxVal
+        else:
+            bg = []
             
         img = np.int16(self.process_disp_img(
             img = img,
             axes = axes,
+            background = bg,
             roi_coords = [
                 roi_coords[0],
                 roi_coords[1],
@@ -4736,7 +4888,7 @@ class OpenPivGui(tk.Tk):
             preproc = preproc,
             preview = preview, 
             show_mask = show_mask
-        )*2**8)
+        )*255)
         print('Processed image')
         if plot == True:
             self.img_shape = img.shape
@@ -4744,10 +4896,6 @@ class OpenPivGui(tk.Tk):
                          vmax=self.p['matplot_intensity_max'],
                          vmin=self.p['matplot_intensity_min'],
                         )
-            axes.xaxis.set_major_formatter(plt.NullFormatter())
-            axes.yaxis.set_major_formatter(plt.NullFormatter())
-            axes.set_xticks([])
-            axes.set_yticks([])
             self.fig.canvas.draw()
         else:
             return img
@@ -4759,6 +4907,7 @@ class OpenPivGui(tk.Tk):
                          axes,
                          roi_coords,
                          mask_coords,
+                         background = [],
                          invert_mask = False,
                          offset_x = 0,
                          offset_y = 0,
@@ -4767,10 +4916,15 @@ class OpenPivGui(tk.Tk):
                          preview = False,
                          preproc = True,
                          show_mask = True):
+        
+        if preview:
+            if len(background) > 1:
+                img = self.preprocessing_methods['temporal_filters'](img, background, self.p)
+                
         if self.p['apply_second_only'] == True:
             if self.toggle == 'b':
                 if self.p['debug']:
-                    print('Show_img: Performming transformation')
+                    print('Show_img: Performing transformation')
                 img = self.preprocessing_methods['transformations'](img, self.p)
         else:
             if self.p['debug']:
@@ -4782,10 +4936,6 @@ class OpenPivGui(tk.Tk):
             self.p,
             preproc = False,
             preview = False,
-            roi_xmin = '',
-            roi_xmax = '',
-            roi_ymin = '',
-            roi_ymax = '',
         )  
         
         if preproc == True:
@@ -4817,6 +4967,10 @@ class OpenPivGui(tk.Tk):
                 self.p,
                 preproc = True,
                 preview = preview,
+            )
+            
+            img = self.preprocessing_methods['apply_roi'](
+                img,
                 roi_xmin = xmin,
                 roi_xmax = xmax,
                 roi_ymin = ymin,
@@ -4836,6 +4990,8 @@ class OpenPivGui(tk.Tk):
                                  edgecolor = self.p['roi_border'],
                                  linestyle = self.p['roi_line_style'])
                 if show_mask:
+                    if preview:
+                        img = self.preprocessing_methods['apply_mask'](img*255, mask_coords, self.p) / 255
                     add_disp_mask(
                         axes,
                         mask_coords,

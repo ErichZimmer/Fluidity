@@ -300,16 +300,16 @@ class image_spatial_filters(AddIn):
             ['Save mask', 'Load mask'],
             None],
 
-        'mask_apply_all':
-            [2740, 'sub_button_static_c', None, 
-            "self.apply_mask_all()",
-            'Apply to select frames',
-            None],
-
         'mask_load_external':
-            [2745, 'sub_button_static_c', None, 
+            [2740, 'sub_button_static_c', None, 
             "self.mask_load_external()",
             'Load image mask',
+            None],
+        
+        'mask_apply_all':
+            [2745, 'sub_button_static_c', None, 
+            "self.apply_mask_all()",
+            'Apply to select frames',
             None],
 
         'mask_selection':
@@ -388,8 +388,8 @@ class image_spatial_filters(AddIn):
                 'zero', 
                 'mean intensity', 
                 'max intensity',
-                #'max value (256)',
-                #'random'
+                'max value (255)',
+                'random'
             ),
             'set masked pixels to',
             'Define masked pixels.'],
@@ -411,24 +411,10 @@ class image_spatial_filters(AddIn):
         parameter,
         preproc = True,
         preview = True,
-        roi_xmin = '',
-        roi_xmax = '',
-        roi_ymin = '',
-        roi_ymax = '',
     ):
     
         '''Starting the pre-processing chain'''    
         if preproc == True:
-            if roi_xmin and roi_xmax and roi_ymin and roi_ymax != ('', ' '):
-                try:
-                    xmin=int(roi_xmin)
-                    xmax=int(roi_xmax)
-                    ymin=int(roi_ymin)
-                    ymax=int(roi_ymax)
-                    img = img[ymin:ymax,xmin:xmax]  
-                except:
-                    print('Invalid value in roi, ignoring filter')
-
             if parameter['invert'] == True:
                 img = util.invert(img)
 
@@ -517,6 +503,26 @@ class image_spatial_filters(AddIn):
         return img
     
     
+    def apply_roi_to_image(
+        self,
+        img, 
+        roi_xmin = '',
+        roi_xmax = '',
+        roi_ymin = '',
+        roi_ymax = '',
+    ):
+        if roi_xmin and roi_xmax and roi_ymin and roi_ymax != ('', ' '):
+            try:
+                xmin=int(roi_xmin)
+                xmax=int(roi_xmax)
+                ymin=int(roi_ymin)
+                ymax=int(roi_ymax)
+                img = img[ymin:ymax,xmin:xmax]  
+            except:
+                print('Invalid value in roi, ignoring filter')
+        return img
+    
+    
     def generate_mask(self, mask_img, parameter, proc = True):
         if proc == True:
             _, mask_img = piv_pre.dynamic_masking(
@@ -556,13 +562,13 @@ class image_spatial_filters(AddIn):
                 mask_val = int(np.mean(img))
             elif parameter['masked_set_pixels'] == 'max intensity':
                 mask_val = np.max(img)
-            elif parameter['masked_set_pixels'] == 'max value (256)':
-                mask_val = 2**8
-            elif parameter['masked_set_pixels'] == 'random':
+            elif parameter['masked_set_pixels'] == 'max value (255)':
+                mask_val = 255
+            elif parameter['masked_set_pixels'] == 'random': # failed testing
                 mask_val = np.random.rand(img.shape[0], img.shape[1])
                 max_val = img.max()
-                if max_val > 2**8:
-                    max_val = 2**8
+                if max_val > 255:
+                    max_val = 255
                 mask_val = np.uint8(mask_val * max_val)[xymask==1]
             img[xymask==1] = mask_val
         return img
@@ -574,6 +580,9 @@ class image_spatial_filters(AddIn):
         # has to be the method which is implemented above
         gui.preprocessing_methods.update(
             {"spatial_filters": self.process_image}
+        )
+        gui.preprocessing_methods.update(
+            {"apply_roi": self.apply_roi_to_image}
         )
         gui.preprocessing_methods.update(
             {"generate_mask": self.generate_mask}

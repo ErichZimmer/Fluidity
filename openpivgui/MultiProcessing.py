@@ -81,8 +81,20 @@ class MultiProcessing(piv_tls.Multiprocesser):
         print('Generating FFT object')
         self.parameter['pass_1'] = True
         try: # example of using different fft libraries, is also done inefficiently
-            if self.parameter['use_FFTW'] != True or self.parallel == True:
+            if self.parameter['use_FFTW'] != True:# or self.parallel == True:
                 raise Exception('Disabled FFTW via exception')
+            def rfft2(aa, s = [], axis = (-2,-1)):
+                fft_mem = FFTW.empty_aligned(aa.shape, dtype = 'float32')
+                if len(s) < 1: s = None
+                fft_forward = FFTW.builders.rfft2(fft_mem, s = s, axes = (-2,-1))
+                return fft_forward(aa)
+            
+            def irfft2(aa, axis = (-2,-1)):
+                fft_mem = FFTW.empty_aligned(aa.shape, dtype = 'complex64')
+                fft_backward = FFTW.builders.irfft2(fft_mem, axes = (-2,-1))
+                return fft_backward(aa)
+            
+            ''' # can't use parallel processing/ uses too much memory
             frame_a = piv_tls.imread(self.files_a[0])
             #FFTW.config.NUM_THREADS = os.cpu_count() 
             FFTW.config.PLANNER_EFFORT = 'FFTW_ESTIMATE'
@@ -274,17 +286,17 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 else:
                     break;
             print('Using python wrapper of FFTW library')
-        #'''
+            '''
+            print('Using FFTW library')
         except:
             from scipy.fft import rfft2, irfft2
-            for i in range(1, 7):
-                if self.parameter[f'pass_{i}'] == True:
-                    self.rfft_plans[f'pass_{i}'] = rfft2
-                    self.irfft_plans[f'pass_{i}'] = irfft2
-                else:
-                    break;
             print('Using PocketFFT library')
-        #'''
+        for i in range(1, 2):#7):
+            if self.parameter[f'pass_{i}'] == True:
+                self.rfft_plans[f'pass_{i}'] = rfft2
+                self.irfft_plans[f'pass_{i}'] = irfft2
+            else:
+                break;
         if files_a != None:
             #if self.parameter['swap_files']:
             #    self.files_a, self.files_b = self.files_b, self.files_a
@@ -303,6 +315,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
             file_b (str) -- image file b
             counter (int) -- index pointing to an element of the filename list
         '''
+        img_dtype = 'float32' # anything lower than float 32 causes larger RMS and bias errors
         file_a, file_b, counter = args
         frame_a = piv_tls.imread(file_a)
         frame_b = piv_tls.imread(file_b)
@@ -348,21 +361,25 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 
         print('Pre-processing image 1')
         frame_a = self.preproc['spatial_filters']( # float32 takes less space for FFTs
-                frame_a, 
-                self.parameter,
-                preproc            = True,
-                roi_xmin           = roi_xmin,
-                roi_xmax           = roi_xmax,
-                roi_ymin           = roi_ymin,
-                roi_ymax           = roi_ymax,
-                )*2**8
+            frame_a, 
+            self.parameter,
+            preproc = True,
+        )
+        
+        frame_a = self.preproc['apply_roi'](
+            frame_a,
+            roi_xmin = roi_xmin,
+            roi_xmax = roi_xmax,
+            roi_ymin = roi_ymin,
+            roi_ymax = roi_ymax,
+        ) * 255
+            
         
         if len(mask_coords) >= 1:
             print('Applying mask to image 1')
             frame_a = self.preproc['apply_mask'](frame_a, mask_coords, self.parameter)
             
-        frame_a = frame_a.astype('float32')    
-        
+        frame_a = frame_a.astype(img_dtype)    
         maxVal = frame_b.max()
         frame_b = frame_b.astype('float32')
         frame_b /= maxVal
@@ -379,21 +396,25 @@ class MultiProcessing(piv_tls.Multiprocesser):
             frame_b = self.preproc['phase_separation'](frame_b, self.parameter)
                 
         print('Pre-processing image 2')
-        frame_b = self.preproc['spatial_filters'](
-                frame_b, 
-                self.parameter,
-                preproc            = True,
-                roi_xmin           = roi_xmin,
-                roi_xmax           = roi_xmax,
-                roi_ymin           = roi_ymin,
-                roi_ymax           = roi_ymax,
-                )*2**8
+        frame_b = self.preproc['spatial_filters']( # float32 takes less space for FFTs
+            frame_b, 
+            self.parameter,
+            preproc = True,
+        )
+        
+        frame_b = self.preproc['apply_roi'](
+            frame_b,
+            roi_xmin = roi_xmin,
+            roi_xmax = roi_xmax,
+            roi_ymin = roi_ymin,
+            roi_ymax = roi_ymax,
+        ) * 255
         
         if len(mask_coords) >= 1:
             print('Applying mask to image 2')
             frame_b = self.preproc['apply_mask'](frame_b, mask_coords, self.parameter)
             
-        frame_b = frame_b.astype('float32')   
+        frame_b = frame_b.astype(img_dtype)   
         
         if self.parameter['analysis'] != True:
             raise Exception('Cancled analysis via exception')
@@ -456,7 +477,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 do_s2n = False
 
             x, y, u, v, s2n, corr = pivware.firstpass(
-                frame_a.astype('float32'), frame_b.astype('float32'),
+                frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                 window_size                = corr_window,
                 overlap                    = overlap,
                 normalize_intensity        = self.parameter['normalize_intensity'],
@@ -619,7 +640,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     else:
                         do_s2n = False
                     x, y, u, v, s2n, corr = pivware.multipass(
-                        frame_a.astype('float32'), frame_b.astype('float32'),
+                        frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                         corr_window,
                         overlap,
                         passes, # number of iterations 
@@ -642,8 +663,8 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         do_sig2noise               = do_s2n,
                         sig2noise_method           = self.parameter['s2n_method'],
                         sig2noise_mask             = self.parameter['s2n_mask'],
-                        rfft2 = self.rfft_plans[f'pass_{i}'],
-                        irfft2 = self.irfft_plans[f'pass_{i}'],
+                        rfft2 = self.rfft_plans[f'pass_{1}'],
+                        irfft2 = self.irfft_plans[f'pass_{1}'],
                     )
                     if i != passes or self.parameter['validate_last_pass'] == True:
                         startn = time.time()
@@ -773,7 +794,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['x'] = x
         results['y'] = y
         results['u'] = u
-        results['v'] = -v
+        results['v'] = -v 
         results['tp'] = typevector
         results['s2n'] = s2n
             
@@ -791,12 +812,16 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     f'tmp/frame_{counter}.npy'), 
                 results
             )
+            del corr
         else:
             results['corr'] = corr
+            del corr
             return results
+        
     
     
     def ensemble_solution(self):
+        img_dtype = 'float32'
         passes = 1
         for i in range(2, 7):
             if self.parameter['pass_%1d' % i]:
@@ -880,20 +905,24 @@ class MultiProcessing(piv_tls.Multiprocesser):
 
             print('Pre-processing image 1')
             frame_a = self.preproc['spatial_filters']( # float32 takes less space for FFTs
-                    frame_a, 
-                    self.parameter,
-                    preproc            = True,
-                    roi_xmin           = roi_xmin,
-                    roi_xmax           = roi_xmax,
-                    roi_ymin           = roi_ymin,
-                    roi_ymax           = roi_ymax,
-                    )*2**8
+                frame_a, 
+                self.parameter,
+                preproc = True,
+            )
+        
+            frame_a = self.preproc['apply_roi'](
+                frame_a,
+                roi_xmin = roi_xmin,
+                roi_xmax = roi_xmax,
+                roi_ymin = roi_ymin,
+                roi_ymax = roi_ymax,
+            ) * 255
 
             if len(mask_coords) >= 1:
                 print('Applying mask to image 1')
                 frame_a = self.preproc['apply_mask'](frame_a, mask_coords, self.parameter)
 
-            frame_a = frame_a.astype('float32')    
+            frame_a = frame_a.astype(img_dtype)    
 
             maxVal = frame_b.max()
             frame_b = frame_b.astype('float32')
@@ -911,27 +940,31 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 frame_b = self.preproc['phase_separation'](frame_b, self.parameter)
 
             print('Pre-processing image 2')
-            frame_b = self.preproc['spatial_filters'](
-                    frame_b, 
-                    self.parameter,
-                    preproc            = True,
-                    roi_xmin           = roi_xmin,
-                    roi_xmax           = roi_xmax,
-                    roi_ymin           = roi_ymin,
-                    roi_ymax           = roi_ymax,
-                    )*2**8
+            frame_b = self.preproc['spatial_filters']( # float32 takes less space for FFTs
+                frame_b, 
+                self.parameter,
+                preproc = True,
+            )
+        
+            frame_b = self.preproc['apply_roi'](
+                frame_b,
+                roi_xmin = roi_xmin,
+                roi_xmax = roi_xmax,
+                roi_ymin = roi_ymin,
+                roi_ymax = roi_ymax,
+            ) * 255
 
             if len(mask_coords) >= 1:
                 print('Applying mask to image 2')
                 frame_b = self.preproc['apply_mask'](frame_b, mask_coords, self.parameter)
 
-            frame_b = frame_b.astype('float32')
+            frame_b = frame_b.astype(img_dtype)
 
             if self.parameter['analysis'] != True:
                 raise Exception('Cancled analysis via exception')
 
             corr = pivware.firstpass(
-                frame_a.astype('float32'), frame_b.astype('float32'),
+                frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                 window_size                = corr_window,
                 overlap                    = overlap,
                 normalize_intensity        = self.parameter['normalize_intensity'],
@@ -1146,20 +1179,24 @@ class MultiProcessing(piv_tls.Multiprocesser):
 
                     print('Pre-processing image 1')
                     frame_a = self.preproc['spatial_filters']( # float32 takes less space for FFTs
-                            frame_a, 
-                            self.parameter,
-                            preproc            = True,
-                            roi_xmin           = roi_xmin,
-                            roi_xmax           = roi_xmax,
-                            roi_ymin           = roi_ymin,
-                            roi_ymax           = roi_ymax,
-                            )*2**8
+                        frame_a, 
+                        self.parameter,
+                        preproc = True,
+                    )
+
+                    frame_a = self.preproc['apply_roi'](
+                        frame_a,
+                        roi_xmin = roi_xmin,
+                        roi_xmax = roi_xmax,
+                        roi_ymin = roi_ymin,
+                        roi_ymax = roi_ymax,
+                    ) * 255
 
                     if len(mask_coords) >= 1:
                         print('Applying mask to image 1')
                         frame_a = self.preproc['apply_mask'](frame_a, mask_coords, self.parameter)
 
-                    frame_a = frame_a.astype('float32')    
+                    frame_a = frame_a.astype(img_dtype)    
 
                     maxVal = frame_b.max()
                     frame_b = frame_b.astype('float32')
@@ -1177,27 +1214,31 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         frame_b = self.preproc['phase_separation'](frame_b, self.parameter)
 
                     print('Pre-processing image 2')
-                    frame_b = self.preproc['spatial_filters'](
-                            frame_b, 
-                            self.parameter,
-                            preproc            = True,
-                            roi_xmin           = roi_xmin,
-                            roi_xmax           = roi_xmax,
-                            roi_ymin           = roi_ymin,
-                            roi_ymax           = roi_ymax,
-                            )*2**8
+                    frame_b = self.preproc['spatial_filters']( # float32 takes less space for FFTs
+                        frame_b, 
+                        self.parameter,
+                        preproc = True,
+                    )
+
+                    frame_b = self.preproc['apply_roi'](
+                        frame_b,
+                        roi_xmin = roi_xmin,
+                        roi_xmax = roi_xmax,
+                        roi_ymin = roi_ymin,
+                        roi_ymax = roi_ymax,
+                    ) * 255
 
                     if len(mask_coords) >= 1:
                         print('Applying mask to image 2')
                         frame_b = self.preproc['apply_mask'](frame_b, mask_coords, self.parameter)
 
-                    frame_b = frame_b.astype('float32')
+                    frame_b = frame_b.astype(img_dtype)
 
                     if self.parameter['analysis'] != True:
                         raise Exception('Cancled analysis via exception')
                     
                     corr = pivware.multipass(
-                        frame_a.astype('float32'), frame_b.astype('float32'),
+                        frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                         corr_window,
                         overlap,
                         passes, # number of iterations 
@@ -1465,7 +1506,7 @@ class pivware():
                 aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
                 bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
             ) / (aa.shape[1] * aa.std(axis = (-2,-1))[:, np.newaxis, np.newaxis] *
-                 aa.shape[2] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float32')
+                 aa.shape[2] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float16')
         #elif algorithm.lower() == 'normalized fft correlation':
         #    corr = piv_prc.fft_correlate_images(
         #        aa,bb, 
@@ -1490,6 +1531,7 @@ class pivware():
                 rfft2 = rfft2,
                 irfft2 = irfft2,
             )
+        corr = corr.astype('float32')
         print(f'Correlated images ({_round(time.time() - start, 3)} second(s))')  
         print(f'Memory allocated towards correlation matrix: {corr.nbytes / 1e6} MB')
         
@@ -1682,7 +1724,7 @@ class pivware():
                 aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
                 bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
             ) / (aa.shape[1] * aa.std(axis = (-2,-1))[:, np.newaxis, np.newaxis] *
-                 aa.shape[2] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float32')
+                 aa.shape[2] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float16')
         #elif algorithm.lower() == 'normalized fft correlation':
         #    corr = piv_prc.fft_correlate_images(
         #        aa,bb, 
@@ -1708,13 +1750,14 @@ class pivware():
                 rfft2 = rfft2,
                 irfft2 = irfft2,
             )
-        if weight.mean() != 1.0:
-            weight = piv_prc.fft_correlate_images(
-                weight[np.newaxis, :, :], 
-                weight[np.newaxis, :, :],
-                'circular', True
-            )  
-            corr *= (weight / weight.max())
+        #if weight.mean() != 1.0:
+        #    weight = piv_prc.fft_correlate_images(
+        #        weight[np.newaxis, :, :], 
+        #        weight[np.newaxis, :, :],
+        #        'circular', True
+        #    )  
+        #    corr *= (weight / weight.max())
+        corr = corr.astype('float32')
         print(f'Correlated images ({_round(time.time() - start, 3)} second(s))') 
         print(f'Memory allocated towards correlation matrix: {corr.nbytes / 1e6} MB')
         
@@ -1876,7 +1919,7 @@ class pivware():
             f2a = conj(rfft2(image_a))
             f2b = rfft2(image_b)
             r = f2a * f2b
-            r /= (np.sqrt(np.absolute(f2a) * np.absolute(f2b)) + 1e-10)
+            r /= (np.sqrt(np.absolute(f2a) * np.absolute(f2b)) + 1e-6)
             corr = fftshift(irfft2(r).real, axes=(-2, -1)) * 100 # so it would be in range of float32
         else:
             size = s1 + s2 - 1
@@ -1886,8 +1929,9 @@ class pivware():
                       slice((fsize[1]-s1[1])//2, (fsize[1]+s1[1])//2))
             f2a = conj(rfft2(image_a, fsize, axes=(-2, -1)))
             f2b = rfft2(image_b, fsize, axes=(-2, -1))
-            r = f2a * f2b
-            r /= (np.sqrt(np.absolute(f2a) * np.absolute(f2b)) + 1e-10)
+            r = np.sqrt(np.absolute(f2a) * np.absolute(f2b))
+            r = np.divide(f2a * f2b, r, where = (p != 0))
+           # r /= (np.sqrt(np.absolute(f2a) * np.absolute(f2b)) + 1e-10)
             corr = fftshift(irfft2(r), axes=(-2, -1)).real[fslice] * 100
         return corr / norm.astype('float32')
     
@@ -1898,7 +1942,7 @@ class pivware():
             corr = piv_prc.fft_correlate_windows(
                 aa[i,:,:], 
                 bb[i,:,:],
-            ).astype('float32')
+            ).astype('float16')
             corrMat.append(corr)
         return np.array(corrMat)
     

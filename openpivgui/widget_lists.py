@@ -37,6 +37,10 @@ def button_list():
 
 def widget_list():
     widgets = {
+        'custom_sequence':[
+            'stride',
+            'step',
+        ],
         'disable_autocorrelation':[
             'disable_autocorrelation_distance'
         ],

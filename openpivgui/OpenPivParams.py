@@ -199,11 +199,23 @@ class OpenPivParams():
                  'sequence order',
                  'Select sequence order for evaluation.'],
 
-            'skip':
-                [1065, 'int', 1,
+            'custom_sequence':
+                [1065, 'bool', False, 'bind',
+                 'custom sequence',
+                 'Custom sequence.'],
+            
+            'stride':
+                [1066, 'int', 1,
                  None,
-                 'jump',
-                 'Select sequence order jump for evaluation.' +
+                 'stride',
+                 'Select sequence order stride for evaluation.' +
+                 '\nEx: (1, step),(1+stride, step)'],
+            
+            'step':
+                [1067, 'int', 2,
+                 None,
+                 'step',
+                 'Select sequence order step for evaluation.' +
                  '\nEx: (1+(1+x)),(2+(2+x))'],
             
             'apply_frequence_button':
@@ -616,7 +628,7 @@ class OpenPivParams():
                  'and so on...\n»3« yields best results with expense of slower computation.'], 
             
             'image_deformation_order':
-                [3154, 'sub_int', 1, (1, 2, 3, 4, 5),
+                [3154, 'dummy', 1, (1, 2, 3, 4, 5),
                  'image deformation order',
                  'Deformation order of the spline interpolator. \n' +
                  '»1« yields first order linear interpolation \n'+
@@ -932,6 +944,11 @@ class OpenPivParams():
                 [5248, 'sub', 'm', ('m', 'cm'),
                  'scale units',
                  'Scale calculation in m/dt or cm/dt.'],
+            
+            'origin':
+                [5249, 'dummy', 'top-left', ('top-left', 'bottom-left'),
+                 'origin',
+                 'Image/vector origin'],
             
             'clear_calib_img_button':
                 [5250, 'sub_button_static_c', None, 
@@ -1634,7 +1651,7 @@ class OpenPivParams():
             'export_1_frame':
                 [11005, 'labelframe', None, 
                  None,
-                 'Export current plot figure',
+                 'Export main figure',
                  None],
                 
             'export1_fname':
@@ -1804,6 +1821,86 @@ class OpenPivParams():
                  "self.export_current_image(index = None)",
                  'Export all frame(s)',
                  None],
+            
+            # Convert images to movie
+            'export_4':
+                [11300, None, None, None,
+                 'Export_4',
+                 None],
+            
+            'export4_frame':
+                [11305, 'labelframe', None, None,
+                 'Convert images to movie',
+                 None],
+            
+            'export4_fps':
+                [11310, 'int', 20, None,
+                 'fps',
+                 'Frames per second of the generated movie.'],
+            
+            'export4_fname':
+                [11312, 'str', 'out', None,
+                 'filename',
+                 'Movie filename.'],
+            
+            'export4_ext':
+                [11315, 'str', 'mp4', ('mp4', 'avi', 'gif'),
+                 'extension',
+                 'Movie extension.'],
+            
+            'export4_sort':
+                [11317, 'bool', True, None,
+                 'sort files',
+                 'Sort files before processing.'],
+            
+            'export4_select':
+                [11350, 'button_static_c', None, 
+                 "self.images_to_movie()",
+                 'Select files to process',
+                 None],
+            
+            # Convert images to movie
+            'export_5':
+                [11400, None, None, None,
+                 'Export_5',
+                 None],
+            
+            'export5_frame':
+                [11405, 'labelframe', None, None,
+                 'Convert movie to images',
+                 None],
+            
+            'export_5_label':
+                [11410, 'label', None, None,
+                'All images are converted to uint8',
+                None],
+            
+            'export_5_h-spacer':
+                [11411, 'h-spacer', None, None,
+                 None, 
+                 None,
+                ],
+            
+            'export5_fname':
+                [11413, 'str', 'out_{}', None,
+                 'filename',
+                 'Movie filename.'],
+            
+            'export5_ext':
+                [11415, 'str', 'tif', (
+                    'bmp',
+                    'jpg', 
+                    'png', 
+                    'tif', 
+                 ),
+                 'extension',
+                 'Image filetype extension.'],
+            
+            'export5_select':
+                [11450, 'button_static_c', None, 
+                 "self.movie_to_images()",
+                 'Select movie to process',
+                 None],
         }
 
         # splitting the dictionary for more convenient access
@@ -1815,12 +1912,15 @@ class OpenPivParams():
         self.help = {}
         self.add_parameters(self.default)
 
+        
     def __getitem__(self, key):
         return self.param[key]
 
+    
     def __setitem__(self, key, value):
         self.param[key] = value
 
+        
     def load_settings(self, fname):
         """
             Read parameters from a JSON file.
@@ -1844,6 +1944,7 @@ class OpenPivParams():
                 if key in p:
                     self.param[key] = p[key]
 
+                    
     def dump_settings(self, fname):
         """
             Dump parameter values to a JSON file.
@@ -1862,6 +1963,7 @@ class OpenPivParams():
         except BaseException:
             print('Unable to save settings: ' + fname)
 
+            
     def generate_parameter_documentation(self, group=None):
         """
             Return parameter labels and help as reStructuredText def list.
@@ -1890,6 +1992,7 @@ class OpenPivParams():
                     + str.replace(str(self.help[key]), '\n', '\n    ') + '\n\n'
         return s
 
+    
     def add_parameters(self, param: dict) -> None:
         """
             splitting the dictionary for more convenient access
