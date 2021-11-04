@@ -1,10 +1,12 @@
-# A GUI for Open PIV
+# A GUI for OpenPIV-python
 
-OpenPIV-python GUI is a Graphical User Interphase (GUI), providing fast and efficient workflow for evaluating and post-processing particle image velocimetry (PIV) images or results. This repository is based off of [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui).
+A Graphical User Interface (GUI), providing fast and efficient workflow for evaluating and post-processing particle image velocimetry (PIV) images or results. This repository is based off of [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui).
 ![Screen shot of the GUI showing a vector plot.](https://raw.githubusercontent.com/ErichZimmer/openpiv-python-gui/master/fig/piv_challenge_2014_case_b.JPG)
 
+## Warning
+This GUI was developed hastily for a PIV project and thus has many bugs. Additionally, the GUI may not be tailored to your needs as it has features that was found useful for an in-house PIV system. 
 
-## Usage <a id=usage></a>
+## Usage
 
 1. Press »File« then »load images«. 
 Select some image pairs (Ctrl + Shift for multiple).
@@ -36,6 +38,7 @@ deleted) with new information/parameters.
 
 9. Export results in ASCI-II
 
+[Example output](https://user-images.githubusercontent.com/69478071/140243359-f234c093-4ce6-49d5-ae61-f1bc684de042.mp4)
 
 ## Documentation <a id=documentation></a>
 
