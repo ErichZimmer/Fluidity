@@ -192,6 +192,7 @@ class OpenPivGui(tk.Tk):
         self.corr_frame = None
         self.background_frame_a = []
         self.background_frame_b = []
+        self.calibration_matrix = []
         try:
             self.show(self.p['files_a'][0], preview = False, bypass = True)
         except: pass
@@ -1441,6 +1442,7 @@ class OpenPivGui(tk.Tk):
                 (".mp4","*.mp4"),
                 (".avi","*.avi"),
                 (".gif","*.gif"),
+                ("other","*.*")
             )
         )
         if len(dirr) > 0:
@@ -3927,7 +3929,8 @@ class OpenPivGui(tk.Tk):
         self.ta[1].insert('1.0', self.p['user_func_def'])
     
     
-    def clear_results(self, update_plot = True): 
+    def clear_results(self, update_plot = True):
+        print('Clearing results')
         n = 0
         if 'Average' in self.p['fnames']:
             n += 1
@@ -3956,6 +3959,7 @@ class OpenPivGui(tk.Tk):
             frame.attrs['scale_dist'] = scale_dist
             frame.attrs['scale_vel'] = scale_vel
             frame.attrs['units'] = units
+            frame.attrs['origin'] = origin
 
         if n != 0:
             del self.session['images']['fnames']
