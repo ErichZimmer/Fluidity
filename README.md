@@ -40,8 +40,7 @@ deleted) with new information/parameters.
 
 [Example output](https://user-images.githubusercontent.com/69478071/140243359-f234c093-4ce6-49d5-ae61-f1bc684de042.mp4)
 
-## Documentatio
-n <a id=documentation></a>
+## Documentation <a id=documentation></a>
 
 See wiki
 
