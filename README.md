@@ -1,4 +1,4 @@
-# A GUI for Open PIV
+# A GUI for OpenPIV-python
 
 A Graphical User Interphase (GUI), providing fast and efficient workflow for evaluating and post-processing particle image velocimetry (PIV) images or results. This repository is based off of [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui).
 ![Screen shot of the GUI showing a vector plot.](https://raw.githubusercontent.com/ErichZimmer/openpiv-python-gui/master/fig/piv_challenge_2014_case_b.JPG)
