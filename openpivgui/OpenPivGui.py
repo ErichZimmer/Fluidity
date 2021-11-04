@@ -52,7 +52,7 @@ import sys
 import re
 import os
 
-__version__ = '0.0.2'
+__version__ = '0.0.4'
 
 __licence__ = '''
 This program is free software: you can redistribute it and/or modify
@@ -581,7 +581,6 @@ class OpenPivGui(tk.Tk):
             
     def validate_results(self, index):
         self.get_settings()
-        self.progressbar.start()
         try:
             self.disable_widgets()
             if index != None:
@@ -652,12 +651,10 @@ class OpenPivGui(tk.Tk):
             print('Could not finish validating results\nReason: ' + str(e))
             
         self.enable_widgets()
-        if index != None:
-            self.progressbar.stop()
-        else:
-            self.progressbar.config(
-                mode = 'indeterminate', 
-            )
+        self.progressbar.stop()
+        self.progressbar.config(
+            mode = 'indeterminate', 
+        )
         self.progressbar['value'] = 0
      
 
@@ -698,7 +695,6 @@ class OpenPivGui(tk.Tk):
                 )
             
             for i in range(frame_len):
-                remove = 0
                 if index != None: 
                     i = index
                 else:
@@ -753,12 +749,10 @@ class OpenPivGui(tk.Tk):
         except Exception as e:
             print('Could not finish modifying results\nReason: ' + str(e))
         self.enable_widgets()
-        if index != None:
-            self.progressbar.stop()
-        else:
-            self.progressbar.config(
-                mode = 'indeterminate', 
-            )
+        self.progressbar.stop()
+        self.progressbar.config(
+            mode = 'indeterminate', 
+        )
         self.progressbar['value'] = 0
         
         
@@ -3019,7 +3013,7 @@ class OpenPivGui(tk.Tk):
         else:
             mask = np.full_like(x, 0)
             
-        self.show(self.p['files_' + self.toggle][self.index], bypass = True)
+        self.show(self.p['files_' + self.toggle][self.index], show_results = False)
         self.ax.plot(x[mask == 0], y[mask == 0], 'y+')  
         self.ax.plot(
                 x[mask == 1],
