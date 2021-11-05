@@ -159,12 +159,6 @@ class results_modify(AddIn):
              None,
              None],
             
-        'average_results':
-             [7110, 'button_static_c', None, 
-             "self.average_results()",
-             'Average results',
-             None],
-            
         'modify_current':
             [7115, 'button_static_c', None, 
              "self.start_modifications(index = self.index)",

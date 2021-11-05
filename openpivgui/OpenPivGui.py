@@ -782,17 +782,12 @@ class OpenPivGui(tk.Tk):
             if 'u_mod' in frame:
                 u = np.array(frame['u_mod'])
                 v = np.array(frame['v_mod'])
-            u = u.astype('float32').reshape(-1)
-            v = v.astype('float32').reshape(-1)
+            u = u.astype('float32')#.reshape(-1)
+            v = v.astype('float32')#.reshape(-1)
             u[u == np.nan] = 0
             v[v == np.nan] = 0
-            n = 0
-            if 'average' in self.session['results']:
-                n += 1
-            if 'ensemble' in self.session['results']:
-                n += 1
                 
-            for i in range(1, len(self.p['fnames'])-n):
+            for i in range(1, len(self.p['files_a'])):
                 frame = self.session['results'][f'frame_{i}']
                 un = np.array(frame['u'])
                 vn = np.array(frame['v'])    
@@ -802,16 +797,16 @@ class OpenPivGui(tk.Tk):
                 if 'u_mod' in frame:
                     un = np.array(frame['u_mod'])
                     vn = np.array(frame['v_mod'])
-                un = u.astype('float32').reshape(-1)
-                vn = v.astype('float32').reshape(-1)
+                un = un.astype('float32')#.reshape(-1)
+                vn = vn.astype('float32')#.reshape(-1)
                 un[un == np.nan] = 0
                 vn[vn == np.nan] = 0
-                u += un.astype('float32')
-                v += vn.astype('float32')
+                u = np.sum(np.array([u, un]), axis = 0)
+                v = np.sum(np.array([v, vn]), axis = 0)
                 print(f'Accululated frame {i}')
                 
-            u = np.reshape((u / (len(self.p['fnames'])-n)), x.shape)
-            v = np.reshape((v / (len(self.p['fnames'])-n)), x.shape)
+            u /= len(self.p['files_a'])#np.reshape((u / (len(self.p['files_a']))), x.shape)
+            v /= len(self.p['files_a'])#np.reshape((v / (len(self.p['files_a']))), x.shape)
             
             end = time.time()
             
@@ -1151,9 +1146,9 @@ class OpenPivGui(tk.Tk):
                 defaultextension = '.json',
                 filetypes = [('json', '*.json'), ]
             )))
-        submenu.add_command(label='main figure', command = lambda: self.selection(25))
-        submenu.add_command(label='pre-processed images', command = lambda: self.selection(27))
-        submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(26))
+        submenu.add_command(label='main figure', command = lambda: self.selection(26))
+        submenu.add_command(label='pre-processed images', command = lambda: self.selection(28))
+        submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(27))
         #submenu.add_command(label='TecPlot')
         #submenu.add_command(label='ParaView')
         options.add_cascade(label='Export', menu=submenu)
@@ -1164,9 +1159,9 @@ class OpenPivGui(tk.Tk):
         options.add_cascade(label='Reset', menu=submenu)
         options.add_separator()
         submenu = tk.Menu(options, tearoff=0)
-        submenu.add_command(label='images to movie', command = lambda: self.selection(28))
-        submenu.add_command(label='movie to images', command = lambda: self.selection(29))
-        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(30))
+        submenu.add_command(label='images to movie', command = lambda: self.selection(29))
+        submenu.add_command(label='movie to images', command = lambda: self.selection(30))
+        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(31))
         options.add_cascade(label='Convert', menu=submenu)
         options.add_separator()
         options.add_command(label='Exit', command=self.destroy)
@@ -1218,30 +1213,32 @@ class OpenPivGui(tk.Tk):
                              command=lambda: self.selection(15))
         options.add_command(label='Modify components',
                              command=lambda: self.selection(16))
+        options.add_command(label='Derive components',
+                             command=lambda: self.selection(17))
         postproc.pack(side='left', fill='x')
 
         plot = ttk.Menubutton(f, text='Data exploration')
         options = tk.Menu(plot, tearoff=0)
         plot.config(menu=options)
         options.add_command(
-            label='Vectors', command=lambda: self.selection(17))
+            label='Vectors', command=lambda: self.selection(18))
         options.add_command(
-            label='Contours', command=lambda: self.selection(18))
+            label='Contours', command=lambda: self.selection(19))
         options.add_command(
-            label='Streamlines', command=lambda: self.selection(19))
+            label='Streamlines', command=lambda: self.selection(20))
         options.add_command(
-            label='Statistics', command=lambda: self.selection(20))
+            label='Statistics', command=lambda: self.selection(21))
         options.add_command(
-            label='Extractions', command=lambda: self.selection(21))
+            label='Extractions', command=lambda: self.selection(22))
         options.add_command(
-            label='Preferences', command=lambda: self.selection(22))
+            label='Preferences', command=lambda: self.selection(23))
         plot.pack(side='left', fill='x')
         
         u_func = ttk.Menubutton(f, text='User function')
         options = tk.Menu(u_func, tearoff=0)
         u_func.config(menu=options)
         options.add_command(label='Show user function',
-                             command=lambda: self.selection(24))
+                             command=lambda: self.selection(25))
         options.add_command(label='Execute user function',
                              command=self.text_function)
         u_func.pack(side='left', fill='x')
@@ -1250,7 +1247,7 @@ class OpenPivGui(tk.Tk):
         options = tk.Menu(lab_func, tearoff=0)
         lab_func.config(menu=options)
         options.add_command(label='Show lab book',
-                             command=lambda: self.selection(23))
+                             command=lambda: self.selection(24))
         lab_func.pack(side='left', fill='x')
 
         usage_func = ttk.Menubutton(f, text='Usage')
@@ -2369,6 +2366,7 @@ class OpenPivGui(tk.Tk):
                     frame.attrs['scale_dist'] = 1
                     frame.attrs['scale_vel']  = 1
                     frame.attrs['units']      = [self.p['loaded_units_dist'], self.p['loaded_units_vel']]
+                    frame.attrs['origin']     = 'top-left'
                     
                     frame.create_dataset('x', data = x)
                     frame.create_dataset('y', data = y)

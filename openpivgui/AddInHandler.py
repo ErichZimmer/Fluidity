@@ -23,7 +23,7 @@ def init_add_ins(gui):
     add_ins_to_be_included = [
         'image_transformations',  'image_phase_separation', 
         'image_temporal_filters', 'image_spatial_filters',
-        'results_validate',       'results_modify'
+        'results_validate',       'results_modify', 'results_derive'
     ]
     # Iterate through the selected add-ins, creating an instance of the
     # add-ins and reading out the variables of the class. These are then
