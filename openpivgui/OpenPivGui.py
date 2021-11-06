@@ -4776,7 +4776,7 @@ class OpenPivGui(tk.Tk):
                         vec_plot.get_component(
                             x, y, u, -v, self.p['velocity_color']
                         ),
-                        #cbaxis = ax,
+                        cbaxis = ax,
                         cmap = vec_plot.get_cmap(self.p['color_map']),
                         vmin = vmin,
                         vmax = vmax,

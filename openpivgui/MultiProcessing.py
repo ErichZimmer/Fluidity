@@ -83,15 +83,15 @@ class MultiProcessing(piv_tls.Multiprocesser):
         try: # example of using different fft libraries, is also done inefficiently
             if self.parameter['use_FFTW'] != True:# or self.parallel == True:
                 raise Exception('Disabled FFTW via exception')
-            def rfft2(aa, s = [], axis = (-2,-1)):
+            def rfft2(aa, s = [], axes = (-2,-1)):
                 fft_mem = FFTW.empty_aligned(aa.shape, dtype = 'float32')
                 if len(s) < 1: s = None
-                fft_forward = FFTW.builders.rfft2(fft_mem, s = s, axes = (-2,-1))
+                fft_forward = FFTW.builders.rfft2(fft_mem, s = s, axes = axes)
                 return fft_forward(aa)
             
-            def irfft2(aa, axis = (-2,-1)):
+            def irfft2(aa, axes = (-2,-1)):
                 fft_mem = FFTW.empty_aligned(aa.shape, dtype = 'complex64')
-                fft_backward = FFTW.builders.irfft2(fft_mem, axes = (-2,-1))
+                fft_backward = FFTW.builders.irfft2(fft_mem, axes = axes)
                 return fft_backward(aa)
             
             ''' # can't use parallel processing/ uses too much memory
@@ -1918,20 +1918,20 @@ class pivware():
         if correlation_method == 'circular':
             f2a = conj(rfft2(image_a))
             f2b = rfft2(image_b)
-            r = f2a * f2b
-            r /= (np.sqrt(np.absolute(f2a) * np.absolute(f2b)) + 1e-6)
-            corr = fftshift(irfft2(r).real, axes=(-2, -1)) * 100 # so it would be in range of float32
+            r = np.sqrt(np.absolute(f2a) * np.absolute(f2b))
+            r = np.divide(f2a * f2b, r, where = (r != 0))
+            corr = fftshift(irfft2(r), axes=(-2, -1)).real * 100 # so it would be in range of float32
         else:
             size = s1 + s2 - 1
             fsize = 2 ** np.ceil(np.log2(size)).astype(int)
             fslice = (slice(0, image_a.shape[0]),
                       slice((fsize[0]-s1[0])//2, (fsize[0]+s1[0])//2),
                       slice((fsize[1]-s1[1])//2, (fsize[1]+s1[1])//2))
+            
             f2a = conj(rfft2(image_a, fsize, axes=(-2, -1)))
             f2b = rfft2(image_b, fsize, axes=(-2, -1))
             r = np.sqrt(np.absolute(f2a) * np.absolute(f2b))
-            r = np.divide(f2a * f2b, r, where = (p != 0))
-           # r /= (np.sqrt(np.absolute(f2a) * np.absolute(f2b)) + 1e-10)
+            r = np.divide(f2a * f2b, r, where = (r != 0))
             corr = fftshift(irfft2(r), axes=(-2, -1)).real[fslice] * 100
         return corr / norm.astype('float32')
     

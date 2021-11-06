@@ -785,19 +785,20 @@ def plot_colorbar(
         vmin = np.nanmin(component)
     if vmax == None:
         vmax = np.nanmax(component)
-    c = plt.cm.ScalarMappable(
+    cm = plt.cm.ScalarMappable(
         cmap = cmap,
         norm = plt.Normalize(
             vmin = vmin,
             vmax = vmax
         )
     )
-    cb = fig.colorbar(
-        c,
-        cax = cbaxis,
+    divider = make_axes_locatable(cbaxis)
+    cax = divider.append_axes('bottom', size = "5%", pad = 0.3)
+    cb = plt.colorbar(
+        cm,
+        cax = cax,
         orientation = 'horizontal',
         #extendrect = True
-        #pad = .05
     )
     cb.ax.xaxis.set_ticks_position('top')
     cb.ax.xaxis.set_label_position('top')
