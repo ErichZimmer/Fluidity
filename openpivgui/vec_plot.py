@@ -771,6 +771,7 @@ def get_component(x, y, u, v, component = 'magnitude'):
     
 def plot_colorbar(
     fig, 
+    parameter,
     component,
     cbaxis = None,
     cmap = 'viridis',
@@ -778,9 +779,7 @@ def plot_colorbar(
     vmax = None,
 ):
     if cbaxis == None:
-        n = [0.05, 0.05, 0.9, 0.05]
-        #n = [0,0,1,0.05]
-        cbaxis = fig.add_axes(n)
+        cbaxis = fig.get_axes()[0]
     if vmin == None:
         vmin = np.nanmin(component)
     if vmax == None:
@@ -793,12 +792,13 @@ def plot_colorbar(
         )
     )
     divider = make_axes_locatable(cbaxis)
-    cax = divider.append_axes('bottom', size = "5%", pad = 0.3)
+    cax = divider.append_axes('bottom', size = 0.2, pad = 0.3)
     cb = plt.colorbar(
         cm,
+        #ax = cax,
         cax = cax,
         orientation = 'horizontal',
-        #extendrect = True
+        extendrect = True,
     )
     cb.ax.xaxis.set_ticks_position('top')
     cb.ax.xaxis.set_label_position('top')

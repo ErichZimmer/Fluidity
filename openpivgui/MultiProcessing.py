@@ -880,6 +880,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
 
             roi_coords = self.settings[f'{counter}'][0]
             mask_coords = self.settings[f'{counter}'][1]
+            mask_c = mask_coords.copy()
             try:
                 roi_xmin = int(roi_coords[0])
                 roi_xmax = int(roi_coords[1])
@@ -889,6 +890,12 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 roi_xmin = 0
                 roi_ymin = 0
                 roi_ymax, roi_xmax = frame_a.shape
+
+            for i in range(len(mask_coords)):
+                temp = np.array(mask_coords[i])
+                temp[:,0] -= roi_xmin
+                temp[:,1] -= roi_ymin
+                mask_coords[i] = temp
 
             maxVal = frame_a.max()
             frame_a = frame_a.astype('float32')
@@ -909,7 +916,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 self.parameter,
                 preproc = True,
             )
-        
+
             frame_a = self.preproc['apply_roi'](
                 frame_a,
                 roi_xmin = roi_xmin,
@@ -918,12 +925,12 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 roi_ymax = roi_ymax,
             ) * 255
 
+
             if len(mask_coords) >= 1:
                 print('Applying mask to image 1')
                 frame_a = self.preproc['apply_mask'](frame_a, mask_coords, self.parameter)
 
             frame_a = frame_a.astype(img_dtype)    
-
             maxVal = frame_b.max()
             frame_b = frame_b.astype('float32')
             frame_b /= maxVal
@@ -945,7 +952,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 self.parameter,
                 preproc = True,
             )
-        
+
             frame_b = self.preproc['apply_roi'](
                 frame_b,
                 roi_xmin = roi_xmin,
@@ -958,7 +965,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 print('Applying mask to image 2')
                 frame_b = self.preproc['apply_mask'](frame_b, mask_coords, self.parameter)
 
-            frame_b = frame_b.astype(img_dtype)
+            frame_b = frame_b.astype(img_dtype)   
 
             if self.parameter['analysis'] != True:
                 raise Exception('Cancled analysis via exception')
@@ -979,6 +986,8 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 do_sig2noise               = do_s2n,
                 sig2noise_method           = self.parameter['s2n_method'],
                 sig2noise_mask             = self.parameter['s2n_mask'],
+                rfft2                      = self.rfft_plans[f'pass_{1}'],
+                irfft2                     = self.irfft_plans[f'pass_{1}'],
             )[5]
             
             if counter == 0:
@@ -999,12 +1008,16 @@ class MultiProcessing(piv_tls.Multiprocesser):
             corr_window, 
             overlap
         )
+        
+        corr_min = corr_avg.min(axis = (-2,-1)) # avoid negative peaks 
+        corr_min[corr_min > 0] = 0
+        corr_avg -= corr_min[:, np.newaxis, np.newaxis]
         u, v = piv_prc.vectorized_correlation_to_displacements(
             corr_avg, 
             n_rows,
             n_cols,
             subpixel_method=self.parameter['subpixel_method'],
-            offset_minimum = True
+            #offset_minimum = True
         )
         
         # validating first pass, signal to noise calc.
@@ -1020,7 +1033,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
             mask = np.full_like(x, 0)
             if self.parameter['fp_peak2peak_validation'] == True:
                 sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                    corr, 
+                    corr_avg, 
                     sig2noise_method='peak2peak', 
                     width = self.parameter['fp_peak2peak_mask_width']
                 ).reshape(u.shape)
@@ -1041,7 +1054,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 
             if self.parameter['fp_peak2mean_validation'] == True:
                 sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                    corr, 
+                    corr_avg, 
                     sig2noise_method = 'peak2mean', 
                     width = self.parameter['fp_peak2peak_mask_width']
                 ).reshape(u.shape)
@@ -1154,6 +1167,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
 
                     roi_coords = self.settings[f'{counter}'][0]
                     mask_coords = self.settings[f'{counter}'][1]
+                    mask_c = mask_coords.copy()
                     try:
                         roi_xmin = int(roi_coords[0])
                         roi_xmax = int(roi_coords[1])
@@ -1163,6 +1177,12 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         roi_xmin = 0
                         roi_ymin = 0
                         roi_ymax, roi_xmax = frame_a.shape
+
+                    for i in range(len(mask_coords)):
+                        temp = np.array(mask_coords[i])
+                        temp[:,0] -= roi_xmin
+                        temp[:,1] -= roi_ymin
+                        mask_coords[i] = temp
 
                     maxVal = frame_a.max()
                     frame_a = frame_a.astype('float32')
@@ -1192,12 +1212,12 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         roi_ymax = roi_ymax,
                     ) * 255
 
+
                     if len(mask_coords) >= 1:
                         print('Applying mask to image 1')
                         frame_a = self.preproc['apply_mask'](frame_a, mask_coords, self.parameter)
 
                     frame_a = frame_a.astype(img_dtype)    
-
                     maxVal = frame_b.max()
                     frame_b = frame_b.astype('float32')
                     frame_b /= maxVal
@@ -1232,7 +1252,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         print('Applying mask to image 2')
                         frame_b = self.preproc['apply_mask'](frame_b, mask_coords, self.parameter)
 
-                    frame_b = frame_b.astype(img_dtype)
+                    frame_b = frame_b.astype(img_dtype)  
 
                     if self.parameter['analysis'] != True:
                         raise Exception('Cancled analysis via exception')
@@ -1260,6 +1280,8 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         do_sig2noise               = do_s2n,
                         sig2noise_method           = self.parameter['s2n_method'],
                         sig2noise_mask             = self.parameter['s2n_mask'],
+                        rfft2                      = self.rfft_plans[f'pass_{1}'],
+                        irfft2                     = self.irfft_plans[f'pass_{1}'],
                     )[5]
                     if counter == 0:
                         corr_avg = corr
@@ -1269,24 +1291,57 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     
                 corr_avg /= len(self.files_a)
                 
-                x, y = piv_prc.get_rect_coordinates(
+                xn, yn = piv_prc.get_rect_coordinates(
                     frame_a.shape,
                     corr_window,
                     overlap
                 )
+                
                 n_rows, n_cols = piv_prc.get_field_shape(
                     frame_a.shape, 
                     corr_window, 
                     overlap
                 )
-
-                u, v = piv_prc.vectorized_correlation_to_displacements(
+                
+                corr_min = corr_avg.min(axis = (-2,-1)) # avoid negative peaks 
+                corr_min[corr_min > 0] = 0
+                corr_avg -= corr_min[:, np.newaxis, np.newaxis]
+                un, vn = piv_prc.vectorized_correlation_to_displacements(
                     corr_avg, 
                     n_rows,
                     n_cols,
                     subpixel_method=self.parameter['subpixel_method'],
-                    offset_minimum = True
+                    #offset_minimum = True
                 )
+                
+                y_old = y[:, 0]
+                x_old = x[0, :]
+                y_int = yn[:, 0]
+                x_int = xn[0, :]
+                
+                ip = RectBivariateSpline(
+                    y_old, x_old, u.filled(0.),
+                    kx = self.parameter['grid_interpolation_order'],
+                    ky = self.parameter['grid_interpolation_order'],
+                )
+                u_pre = ip(y_int, x_int)
+
+                ip2 = RectBivariateSpline(
+                    y_old, x_old, v.filled(0.),
+                    kx = self.parameter['grid_interpolation_order'],
+                    ky = self.parameter['grid_interpolation_order'],
+                )
+                v_pre = ip2(y_int, x_int)
+                
+                if self.parameter['deformation_method'] == 'none':
+                    u = (un + u_pre) / 2
+                    v = (vn + v_pre) / 2
+                else:
+                    u = un + u_pre
+                    v = vn + v_pre
+                
+                x, y = xn, yn
+                
                 
                 if i != passes or self.parameter['validate_last_pass'] == True:
                     # applying mask(s)
@@ -1294,7 +1349,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     mask = np.full_like(x, 0)
                     if self.parameter['sp_peak2peak_validation'] == True:
                         sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                            corr, 
+                            corr_avg, 
                             sig2noise_method='peak2peak', 
                             width = self.parameter['sp_peak2peak_mask_width']
                         ).reshape(u.shape)
@@ -1315,7 +1370,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         
                     if self.parameter['sp_peak2mean_validation'] == True:
                         sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                            corr, 
+                            corr_avg, 
                             sig2noise_method = 'peak2mean', 
                             width = self.parameter['sp_peak2peak_mask_width']
                         ).reshape(u.shape)
@@ -1367,7 +1422,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                             robust = self.parameter['robust1']
                         ) 
                         print('Smoothned pass {} for frame: {}'.format(i,counter + self.disp_off))
-                print(f'Finished pass {i}')
+                print(f'\nFinished pass {i}')
                 print(f"window size (y,x): {corr_window[0]}x{corr_window[1]} pixels")
                 print(f'overlap (y,x): {overlap[0]}x{overlap[1]} pixels', '\n')  
                 iterations -= 1
@@ -1632,7 +1687,6 @@ class pivware():
 
         # interpolating the displacements from the old grid onto the new grid
         # y befor x because of numpy works row major
-        start = time.time()
         ip = RectBivariateSpline(
             y_old, x_old, u_old.filled(0.),
             kx = interpolation_order1,

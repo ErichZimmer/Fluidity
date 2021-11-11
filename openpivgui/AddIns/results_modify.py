@@ -140,39 +140,87 @@ class results_modify(AddIn):
             [7082, 'float', 0.8, None,
              'smoothing strength',
              'Strength of the smooth script. Higher scalar number produces ' +
-             'more smoothned data.'],
+             'more smoothed results.'],
 
+        'flip_coords_spacer':
+            [7100, 'h-spacer', None,
+             None,
+             None,
+             None],
+
+        'mflip_x':
+            [7105, 'bool', 'False', None,
+             'flip x-component',
+             'flip x-component array when loading results.'],
+
+        'mflip_y':
+            [7108, 'bool', 'False', None,
+            'flip y-component',
+            'flip y-component array when loading results.'],
+            
+        'mflip_spacer':
+            [7120, 'h-spacer', None,
+             None,
+             None,
+             None],
+
+        'mflip_u':
+            [7121, 'bool', 'False', None,
+             'flip u-component',
+             'flip u-component array when loading results.'],
+
+        'mflip_v':
+            [7122, 'bool', 'False', None,
+             'flip v-component',
+             'flip v-component array when loading results.'],
+
+        'minvert_spacer':
+            [7130, 'h-spacer', None,
+             None,
+             None,
+             None],
+
+        'minvert_u':
+            [7131, 'bool', 'False', None,
+             'invert u-component',
+             'Invert (negative) u-component array when loading results.'],
+
+        'minvert_v':
+            [7132, 'bool', 'False', None,
+             'invert v-component',
+             'Invert (negative) v-component array when loading results.'],
+        
         'mod_exclude_mask_spacer':
-            [7085, 'h-spacer', None,
+            [7285, 'h-spacer', None,
              None,
              None,
              None],
             
         'modification_exlude_mask':
-            [7090, 'bool', False, None,
+            [7290, 'bool', False, None,
              'exclude masked regions',
              'Exclude masked regions from modifications.'],
             
         'apply_mdfy_spacer':
-            [7105, 'h-spacer', None,
+            [7305, 'h-spacer', None,
              None,
              None,
              None],
             
         'modify_current':
-            [7115, 'button_static_c', None, 
+            [7315, 'button_static_c', None, 
              "self.start_modifications(index = self.index)",
              'Apply to current frame',
              None],
             
         'modify_all':
-            [7120, 'button_static_c', None, 
+            [7320, 'button_static_c', None, 
              "self.start_modifications()",
              'Apply to all frames',
              None],
             
         'view_modify':
-            [7130, 'button_static_c', None, 
+            [7330, 'button_static_c', None, 
              "self.show(self.p['files_' + self.toggle][self.index])",
              'Update current frame',
               None],
@@ -190,7 +238,13 @@ class results_modify(AddIn):
         v_component = 0,
         smooth = False,
         strength = 0.8,
-        robust = False
+        robust = False,
+        flip_y = False,
+        flip_x = False,
+        flip_u = False,
+        flip_v = False,
+        invert_u = False,
+        invert_v = False,
     ):
         u = np.ma.masked_array(u, mask)
         v = np.ma.masked_array(v, mask)
@@ -200,6 +254,8 @@ class results_modify(AddIn):
             offset_x = 0
             offset_y = 0
         else:
+            x += offset_x,
+            y += offset_y,
             isSame += 1
 
         if modify_velocity:
@@ -221,14 +277,33 @@ class results_modify(AddIn):
             )
             isSame += 1
 
+        if flip_y:
+            y = np.flipud(y)
+            isSame += 1
+        if flip_x:
+            x = np.fliplr(x)
+            isSame += 1
+        if flip_u:
+            u = np.flip(u)
+            isSame += 1
+        if flip_v:
+            v = np.flip(v)
+            isSame += 1
+        if invert_u:
+            u *= -1
+            isSame += 1
+        if invert_v:
+            v *= -1
+            isSame += 1
+
         if isSame != 0:
             isSame = False
         else:
             isSame = True
 
         return(
-            x + offset_x,
-            y + offset_y,
+            x,
+            y,
             u,
             v,
             isSame

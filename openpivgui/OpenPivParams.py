@@ -273,37 +273,53 @@ class OpenPivParams():
                  'time units',
                  'Time units of the loaded results.'],
             
-            'flip_spacer':
+            'flip_coords_spacer':
                 [1140, 'h-spacer', None,
                  None,
                  None,
                  None],
 
-            'flip_u':
+            'flip_x':
                 [1141, 'bool', 'False', None,
+                 'flip x-component',
+                 'flip x-component array when loading results.'],
+
+            'flip_y':
+                [1142, 'bool', 'False', None,
+                 'flip y-component',
+                 'flip y-component array when loading results.'],
+            
+            'flip_spacer':
+                [1150, 'h-spacer', None,
+                 None,
+                 None,
+                 None],
+
+            'flip_u':
+                [1151, 'bool', 'False', None,
                  'flip u-component',
-                 'flip u-component array when saving RAW results.'],
+                 'flip u-component array when loading results.'],
 
             'flip_v':
-                [1142, 'bool', 'False', None,
+                [1152, 'bool', 'False', None,
                  'flip v-component',
-                 'flip v-component array when saving RAW results.'],
+                 'flip v-component array when loading results.'],
 
             'invert_spacer':
-                [1145, 'h-spacer', None,
+                [1165, 'h-spacer', None,
                  None,
                  None,
                  None],
 
             'invert_u':
-                [1150, 'bool', 'False', None,
+                [1160, 'bool', 'False', None,
                  'invert u-component',
-                 'Invert (negative) u-component when saving RAW results.'],
+                 'Invert (negative) u-component array when loading results.'],
 
             'invert_v':
-                [1151, 'bool', 'False', None,
+                [1161, 'bool', 'False', None,
                  'invert v-component',
-                 'Invert (negative) v-component when saving RAW results.'],
+                 'Invert (negative) v-component array when loading results.'],
             
             'General':
                 [1200, None, None,
@@ -546,9 +562,9 @@ class OpenPivParams():
             
             'ensemble_correlation':
                 [3085, 'bool', False, None,
-                 'ensemble correlation (experimental)',
-                 'Warning: Only single pass works properly.\n'+
-                 'Average the correlation of all frames to obtain better results.'],
+                 'ensemble correlation (slow)',
+                 'Average the correlation of all frames to obtain better results in '+
+                 'sparsely seeded flows.'],
             
             'offset_corr_subpix':
                 [3092, 'dummy', True, None, 

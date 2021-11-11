@@ -52,7 +52,7 @@ import sys
 import re
 import os
 
-__version__ = '0.0.4'
+__version__ = '0.0.5'
 
 __licence__ = '''
 This program is free software: you can redistribute it and/or modify
@@ -393,7 +393,7 @@ class OpenPivGui(tk.Tk):
 
                     start = time.time()
                     self.mp.run(func = self.mp.process, n_cpus = cpu_count)
-                    print(f'Finished processing ({time.time() - start} s)')
+                    print(f'Finished processing ({_round(time.time() - start, 3)} seconds)')
                     
                     self.ttk_widgets['clear_results'].config(state = 'normal')
                     for i in range(len(self.p['files_a'])):
@@ -600,9 +600,18 @@ class OpenPivGui(tk.Tk):
                     i = index
                 else:
                     self.progressbar['value'] = i
-                print(f'Validating frame {i}')
-                self.process_type.config(text = f'Validating frame {i}')
-                frame = self.session['results'][f'frame_{i}']
+                if self.p['fnames'][i] == 'Average':
+                    print('Validating frame Average')
+                    self.process_type.config(text = 'Validating frame Average')
+                    frame = self.session['results']['average']
+                elif self.p['fnames'][i] == 'Ensemble':
+                    print('Validating frame Ensemble')
+                    self.process_type.config(text = 'Validating frame Ensemble')
+                    frame = self.session['results']['ensemble']
+                else:
+                    print(f'Validating frame {i}')
+                    self.process_type.config(text = f'Validating frame {i}')
+                    frame = self.session['results'][f'frame_{i}']
                 mask_coords  = list(literal_eval(frame.attrs['mask_coords']))
                 
                 x = np.array(frame['x']) # incase if there is a different roi somewhere, it won't cause bad errors
@@ -646,8 +655,16 @@ class OpenPivGui(tk.Tk):
                     frame.create_dataset('u_vld', data = u)
                     frame.create_dataset('v_vld', data = v)
                     frame.create_dataset('tp_vld', data = flag)
-                print(f'Validated frame {i}')
-                self.process_type.config(text = f'Validated frame {i}')
+                
+                if self.p['fnames'][i] == 'Average':
+                    print('Validated frame Average')
+                    self.process_type.config(text = 'Validated frame Average')
+                elif self.p['fnames'][i] == 'Ensemble':
+                    print('Validated frame Ensemble')
+                    self.process_type.config(text = 'Validated frame Ensemble')
+                else:
+                    print(f'Validated frame {i}')
+                    self.process_type.config(text = f'Validated frame {i}')
         except Exception as e:
             print('Could not finish validating results\nReason: ' + str(e))
             
@@ -657,6 +674,7 @@ class OpenPivGui(tk.Tk):
             mode = 'indeterminate', 
         )
         self.progressbar['value'] = 0
+        self.progressbar['maximum'] = 100
      
 
     def start_modifications(self, index = None):
@@ -700,9 +718,18 @@ class OpenPivGui(tk.Tk):
                     i = index
                 else:
                     self.progressbar['value'] = i
-                print(f'Modifying frame {i}')
-                self.process_type.config(text = f'Modifying frame {i}')
-                frame = self.session['results'][f'frame_{i}']
+                if self.p['fnames'][i] == 'Average':
+                    print('Modifying frame Average')
+                    self.process_type.config(text = 'Modifying frame Average')
+                    frame = self.session['results']['average']
+                elif self.p['fnames'][i] == 'Ensemble':
+                    print('Modifying frame Ensemble')
+                    self.process_type.config(text = 'Modifying frame Ensemble')
+                    frame = self.session['results']['ensemble']
+                else:
+                    print(f'Modifying frame {i}')
+                    self.process_type.config(text = f'Modifying frame {i}')
+                    frame = self.session['results'][f'frame_{i}']
                 mask_coords  = list(literal_eval(frame.attrs['mask_coords']))
                 
                 x = np.array(frame['x']) # incase if there is a different roi somewhere, it won't cause bad errors
@@ -727,7 +754,13 @@ class OpenPivGui(tk.Tk):
                     v_component     = self.p['modify_v'],
                     smooth          = self.p['smoothn'],
                     strength        = self.p['smoothn_val'],
-                    robust          = self.p['robust']
+                    robust          = self.p['robust'],
+                    flip_y = self.p['mflip_y'],                        
+                    flip_x = self.p['mflip_x'],                        
+                    flip_u = self.p['mflip_u'],
+                    flip_v = self.p['mflip_v'],
+                    invert_u = self.p['minvert_u'],
+                    invert_v = self.p['minvert_v'],
                 )
                 
                 if self.p['offset_grid']:
@@ -745,8 +778,15 @@ class OpenPivGui(tk.Tk):
                 if isSame != True:
                     frame.create_dataset('u_mod', data = u)
                     frame.create_dataset('v_mod', data = v)
-                print(f'Modifyied frame {i}')
-                self.process_type.config(text = f'Modified frame {i}')
+                if self.p['fnames'][i] == 'Average':
+                    print('Modified frame Average')
+                    self.process_type.config(text = 'Modified frame Average')
+                elif self.p['fnames'][i] == 'Ensemble':
+                    print('Modified frame Ensemble')
+                    self.process_type.config(text = 'Modified frame Ensemble')
+                else:
+                    print(f'Modified frame {i}')
+                    self.process_type.config(text = f'Modified frame {i}')
         except Exception as e:
             print('Could not finish modifying results\nReason: ' + str(e))
         self.enable_widgets()
@@ -755,7 +795,7 @@ class OpenPivGui(tk.Tk):
             mode = 'indeterminate', 
         )
         self.progressbar['value'] = 0
-        
+        self.progressbar['maximum'] = 100
         
     def average_results(self):
         start_processing = True
@@ -1209,7 +1249,7 @@ class OpenPivGui(tk.Tk):
         postproc = ttk.Menubutton(f, text='Post-processing')
         options = tk.Menu(postproc, tearoff=0)
         postproc.config(menu=options)
-        options.add_command(label='Validate components',
+        options.add_command(label='Validate components (vector based)',
                              command=lambda: self.selection(15))
         options.add_command(label='Modify components',
                              command=lambda: self.selection(16))
@@ -1660,7 +1700,7 @@ class OpenPivGui(tk.Tk):
                     self.point_v.config(text = "N/A")
                     self.point_flag.config(text = 'N/A')
                     if self.p['debug']:
-                        print('Could not extract components for statistics/nReason: ' + str(e))
+                        print('Could not extract components for statistics\nReason: ' + str(e))
             else:
                 self.point_x.config(text = "N/A")
                 self.point_y.config(text = "N/A")
@@ -2157,9 +2197,9 @@ class OpenPivGui(tk.Tk):
                 self.update_buttons_state(state = 'disabled', apply = False)
                 self.ttk_widgets['apply_frequence_button'].config(state = 'normal')
                 self.ttk_widgets['remove_current_image'].config(state = 'normal')
-                self.show(self.p['img_list'][0], bypass = True, preproc = False, perform_check = False)
                 self.background_frame_a = []
                 self.background_frame_b = []
+                self.show(self.p['img_list'][0], bypass = True, preproc = False, perform_check = False)
                 
                 
     def remove_image(self, index):
@@ -2174,7 +2214,8 @@ class OpenPivGui(tk.Tk):
         self.get_settings()
         self.disable_widgets()
         self.ttk_widgets['apply_frequence_button'].config(state = 'disabled')
-        #self.p['fnames'].config(state = 'disabled')
+        start = time.time()
+        #self.p['fnames'].config(state = 'disabled')        
         try:
             try:
                 if self.p['img_list'][0] == 'none':
@@ -2232,6 +2273,11 @@ class OpenPivGui(tk.Tk):
 
             print('Number of a files: ' + str(len(self.p['files_a'])))
             print('Number of b files: ' + str(len(self.p['files_b'])))
+            self.progressbar.config(
+                mode = 'determinate', 
+                maximum = len(self.p['files_a']),
+                value = 0
+            )
             self.p['fnames'] = []
             # set listbox names and results structure
             for i in range(len(self.p['files_a'])):
@@ -2247,6 +2293,9 @@ class OpenPivGui(tk.Tk):
                 frame.attrs['scale_dist'] = 1
                 frame.attrs['scale_vel'] = 1
                 frame.attrs['origin'] = 'top-left'
+                self.progressbar['value'] = i
+                print(f'Created frame {i}')
+                self.process_type.config(text = f'Created frame {i}')
 
             if 'frames' in img_grp:
                 del img_grp['frames']
@@ -2264,8 +2313,7 @@ class OpenPivGui(tk.Tk):
             self.background_frame_b = []
             print('Allocated space for {} frames(s)'.format(len(self.p['fnames'])))
             print(f"Memory space for each list: ~{_round(np.array(self.p['files_a']).nbytes/1e6, 2)} megabytes")
-            print('Frequencing applied')
-            
+            print(f'Frequencing applied ({_round(time.time() - start, 3)} seconds)')
         except Exception as e:
             print('Could not apply frequencing to currently select images.\n' +
                   'Reason: ' + str(e))
@@ -2330,6 +2378,12 @@ class OpenPivGui(tk.Tk):
                     v = data[['v']].to_numpy().reshape(x.shape)
                     self.img_shape = [y.max(), x.max()]
 
+                    if self.p['flip_y']:
+                        y = np.flipud(y)
+                        
+                    if self.p['flip_x']:
+                        x = np.fliplr(x)
+                        
                     if self.p['flip_u']:
                         u = np.flipud(u)
 
@@ -2862,14 +2916,16 @@ class OpenPivGui(tk.Tk):
         if len(self.background_frame_a) > 1:
             if self.toggle == 'a':
                 background = self.background_frame_a
+                img = piv_tls.imread(self.p['files_a'][self.index])
             else:
                 background = self.background_frame_b
+                img = piv_tls.imread(self.p['files_b'][self.index])
             
             self.fig.clear()
             ax = self.fig.add_axes([0,0,1,1])
             ax.matshow(background, cmap=plt.cm.Greys_r,
-                     vmax=background.max(),
-                     vmin=background.min(),
+                     vmax=img.max(),
+                     vmin=img.min(),
                     )
             ax.axis('off')
             print(f'Max background intensity (before compression): {background.max()}')
@@ -3367,7 +3423,7 @@ class OpenPivGui(tk.Tk):
         dirr = filedialog.askdirectory()
         if len(dirr) > 1:
             started = False
-            for i in range(len(self.p['fnames'])):
+            for i in range(len(self.p['files_a'])):
                 if index != None:
                     i = index
                 print(f'Saving frame {i}')
@@ -3379,10 +3435,18 @@ class OpenPivGui(tk.Tk):
                         )
                         cur_plt = plt.figure(figsize = (sizeX, sizeY))
                     except: cur_plt = plt.figure()
+                        
+                if self.p['fnames'][i] == 'Average':
+                    results = self.session['results']['average']
+                elif self.p['fnames'][i] == 'Ensemble':
+                    results = self.session['results']['ensemble']
+                else:
+                    results = self.session['results'][f'frame_{i}']
+                    
                 self.show(
                     self.p[f'files_{self.toggle}'][i],
                     extFig = cur_plt,
-                    results = self.session['results'][f'frame_{i}'],
+                    results = results,
                     preview = self.p['export1_modified_img']
                 )
                 fname = os.path.join(
@@ -3409,10 +3473,21 @@ class OpenPivGui(tk.Tk):
         self.get_settings()
         dirr = filedialog.askdirectory()
         if len(dirr) > 1:
-            for i in range(len(self.p['fnames'])):
+            for i in range(len(self.p['files_a'])):
                 if index != None:
                     i = index
-                results = self.session['results'][f'frame_{i}']
+                if self.p['fnames'][i] == 'Average':
+                    print('Saving frame Average')
+                    self.process_type.config(text = 'Saving frame Average')
+                    results = self.session['results']['average']
+                elif self.p['fnames'][i] == 'Ensemble':
+                    print('Saving frame Ensemble')
+                    self.process_type.config(text = 'Saving frame Ensemble')
+                    results = self.session['results']['ensemble']
+                else:
+                    print(f'Saving frame {i}')
+                    self.process_type.config(text = f'Saving frame {i}')
+                    results = self.session['results'][f'frame_{i}']
                 if results.attrs['processed']:
                     x = np.array(results['x'])
                     y = np.array(results['y'])
@@ -3495,11 +3570,19 @@ class OpenPivGui(tk.Tk):
                         components = [x,y,u,v]
                         
                     save(components, filename = filename, delimiter = delimiter)
-                    print(f'Saved frame {i}.')
+                    if self.p['fnames'][i] == 'Average':
+                        print('Saved frame Average')
+                        self.process_type.config(text = 'Saved frame Average')
+                    elif self.p['fnames'][i] == 'Ensemble':
+                        print('Saved frame Ensemble')
+                        self.process_type.config(text = 'Saved frame Ensemble')
+                    else:
+                        print(f'Saved frame {i}')
+                        self.process_type.config(text = f'Saved frame {i}')
                     if index != None:
                         break;
                 else:
-                    print(f'Frame {i} does not have stored results. Stopping function.')
+                    print(f'Stopping function\nFrame {i} does not have stored results.')
                     break;
                     
                     
@@ -3507,7 +3590,7 @@ class OpenPivGui(tk.Tk):
         self.get_settings()
         dirr = filedialog.askdirectory()
         if len(dirr) > 1:
-            for i in range(len(self.p['fnames'])):
+            for i in range(len(self.p['file_a'])):
                 if index != None:
                     i = index
                 print(f'Saving frame {i}')
@@ -3960,8 +4043,8 @@ class OpenPivGui(tk.Tk):
             frame.attrs['origin'] = origin
 
         if n != 0:
-            del self.session['images']['fnames']
-            self.session['images'].create_dataset('fnames', data = self.p['fnames'])
+            del self.session['images']['frames']
+            self.session['images'].create_dataset('frames', data = self.p['fnames'])
         if update_plot:
             self.show(self.p['files_' + self.toggle][self.index])
         print('Cleared results for all frames')
@@ -4530,7 +4613,7 @@ class OpenPivGui(tk.Tk):
         else:
             fig = extFig
         fig.clear()
-        ax = fig.add_axes([0,0,1,1])
+        ax = fig.add_axes([0.01,0.01,0.98,0.99])
         ax.axis('off')
         #ax = fig.add_subplot(111)
         if self.rasterize:
@@ -4773,8 +4856,12 @@ class OpenPivGui(tk.Tk):
                             
                     vec_plot.plot_colorbar(
                         fig,
-                        vec_plot.get_component(
-                            x, y, u, -v, self.p['velocity_color']
+                        self.p,
+                        np.ma.masked_array(
+                            data = vec_plot.get_component(
+                                x, y, u, -v, self.p['velocity_color']
+                            ),
+                            mask = xymask,
                         ),
                         cbaxis = ax,
                         cmap = vec_plot.get_cmap(self.p['color_map']),
