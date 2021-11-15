@@ -320,54 +320,7 @@ class results_validate(AddIn):
            [3561, 'float', 1, None,
             'threshold',
             'The signal to noise ratio threshold value.'],
-           
-        
-        
-       'individual_pass_postprocessing':
-           [3603, None, None, None,
-           'PostProcessing',
-            None],
             
-       'piv_pass_postprocessing_frame':
-           [3604, 'labelframe', None,
-            None,
-            'Post-processing',
-            None],
-            
-       'piv_sub_frame3':
-           [3605, 'sub_labelframe', None,
-            None,
-            'interpolation',
-            None],
-            
-       'pass_repl':
-           [3700, 'sub_bool', True, 'bind',
-            'replace vectors',
-            'Replace vectors between each pass.'],
-            
-       'pass_repl_method':
-            [3701, 'sub', 'localmean',
-            ('localmean', 'disk', 'distance'),
-            'replacement method',
-            'Each NaN element is replaced by a weighed average' +
-            'of neighbours. Localmean uses a square kernel, ' +
-            'disk a uniform circular kernel, and distance a ' +
-            'kernel with a weight that is proportional to the ' +
-            'distance.'],
-
-        'pass_repl_iter':
-            [3702, 'sub_int', 10, None,
-             'number of iterations',
-             'If there are adjacent NaN elements, iterative ' +
-             'replacement is needed.'],
-
-        'pass_repl_kernel':
-            [3703, 'sub_int', 2, None,
-            'kernel size [vec]',
-            'Diameter of the NaN interpolation kernel in vectors.'],
-        
-        
-        
             'vld': #oops
                 [6000, None, None, None,
                  'PostProcessing1',
@@ -464,73 +417,24 @@ class results_validate(AddIn):
                 [6042, 'int', 1, None,
                  'local median kernel [vec]',
                  'Local median filter kernel distance from (0,0) in vectors.'],
-            
-            'horizontal_spacer14':
-                [6095, 'h-spacer', None,
-                 None,
-                 None,
-                 None],
+        
+        'vvalidate_current':
+            [6070, 'button_static_c', None, 
+             "self.start_validations(index = self.index)",
+             'Apply to current frame',
+             None],
 
-            'repl':
-                [6100, 'bool', True, 'bind',
-                 'replace outliers',
-                 'Replace outliers.'],
+        'vvalidate_all':
+            [6075, 'button_static_c', None, 
+             "self.start_validations()",
+             'Apply to all frames',
+             None],
 
-            'repl_method':
-                [6101, 'str', 'localmean',
-                 ('localmean', 'disk', 'distance'),
-                 'replacement method',
-                 'Each NaN element is replaced by a weighed average' +
-                 'of neighbours. Localmean uses a square kernel, ' +
-                 'disk a uniform circular kernel, and distance a ' +
-                 'kernel with a weight that is proportional to the ' +
-                 'distance.'],
-
-            'repl_iter':
-                [6102, 'int', 10, None,
-                 'number of iterations',
-                 'If there are adjacent NaN elements, iterative ' +
-                 'replacement is needed.'],
-
-            'repl_kernel':
-                [6103, 'int', 2, None,
-                 'kernel size [vec]',
-                 'Diameter of the weighting kernel in vectors.'],
-
-            'val_exclude_mask_spacer':
-                [6105, 'h-spacer', None,
-                 None,
-                 None,
-                 None],
-            
-             'validation_exlude_mask':
-                [6110, 'bool', False, None,
-                 'exclude masked regions',
-                 'Exclude masked regions from validations.'],
-            
-            'validation_spacer':
-                [6115, 'h-spacer', None,
-                 None,
-                 None,
-                 None],
-            
-            'validate_current':
-                [6120, 'button_static_c', None, 
-                 "self.start_validations(index = self.index)",
-                 'Apply to current frame',
-                 None],
-            
-            'validate_all':
-                [6130, 'button_static_c', None, 
-                 "self.start_validations()",
-                 'Apply to all frames',
-                 None],
-            
-            'view_validate':
-                [6150, 'button_static_c', None, 
-                 "self.show(self.p['files_' + self.toggle][self.index])",
-                 'Update current frame',
-                 None],
+        'view_validated':
+            [6080, 'button_static_c', None, 
+             "self.show(self.p['files_' + self.toggle][self.index])",
+             'Update current frame',
+             None],
     }
 
     
@@ -580,18 +484,16 @@ class results_validate(AddIn):
         local_median = False,
         local_median_thresh = 2,
         local_median_kernel = 1,
-        replace = True,
-        replace_method = 'localmean',
-        replace_inter = 10,
-        replace_kernel = 2,
     ):
         try:
             flag[0]
         except:
             flag = np.full_like(u, 0)
-
+        uo = u.copy()
+        vo = v.copy()
         u = np.ma.masked_array(u, mask)
         v = np.ma.masked_array(v, mask)
+        
         isSame = 0
         if s2n_val == True and s2n is not None:
             u, v, Flag = piv_vld.sig2noise_val(
@@ -632,14 +534,8 @@ class results_validate(AddIn):
                 size        = local_median_kernel)  
             flag += Flag
             isSame += 1
-
-        if replace:
-            u, v = piv_flt.replace_outliers(
-                u, v,
-                method      = replace_method,
-                max_iter    = replace_inter,
-                kernel_size = replace_kernel)
-            isSame += 1
+        
+        flag[flag > 1] = 1
 
         if isSame != 0:
             isSame = False
@@ -706,11 +602,6 @@ class results_validate(AddIn):
             'sp_peak2mean_validation':[
                 'sp_peak2mean_threshold',
             ],
-            'pass_repl':[
-                'pass_repl_method',
-                'pass_repl_iter',
-                'pass_repl_kernel'
-            ],
             'vld_global_thr':[
                 'MinU',
                 'MaxU',
@@ -726,11 +617,6 @@ class results_validate(AddIn):
                 'local_median_threshold',
                 'local_median_size'
             ],
-            'repl':[
-                'repl_method',
-                'repl_iter',
-                'repl_kernel',
-            ],
         })
 
         gui.toggled_buttons += [
@@ -740,7 +626,7 @@ class results_validate(AddIn):
             'set_vel_limits',
             'reset_vel_limits',
             'apply_glov_val_first_pass',
-            'validate_current',
-            'validate_all',
-            'view_validate',
+            'vvalidate_current',
+            'vvalidate_all',
+            'view_validated',
         ]

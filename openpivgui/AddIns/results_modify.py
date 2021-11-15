@@ -141,20 +141,20 @@ class results_modify(AddIn):
              'smoothing strength',
              'Strength of the smooth script. Higher scalar number produces ' +
              'more smoothed results.'],
-
+        
         'flip_coords_spacer':
-            [7100, 'h-spacer', None,
+            [7100, 'dummy', None,
              None,
              None,
              None],
 
         'mflip_x':
-            [7105, 'bool', 'False', None,
+            [7105, 'dummy', False, None,
              'flip x-component',
              'flip x-component array when loading results.'],
 
         'mflip_y':
-            [7108, 'bool', 'False', None,
+            [7108, 'dummy', False, None,
             'flip y-component',
             'flip y-component array when loading results.'],
             
@@ -165,12 +165,12 @@ class results_modify(AddIn):
              None],
 
         'mflip_u':
-            [7121, 'bool', 'False', None,
+            [7121, 'bool', False, None,
              'flip u-component',
              'flip u-component array when loading results.'],
 
         'mflip_v':
-            [7122, 'bool', 'False', None,
+            [7122, 'bool', False, None,
              'flip v-component',
              'flip v-component array when loading results.'],
 
@@ -181,12 +181,12 @@ class results_modify(AddIn):
              None],
 
         'minvert_u':
-            [7131, 'bool', 'False', None,
+            [7131, 'bool', False, None,
              'invert u-component',
              'Invert (negative) u-component array when loading results.'],
 
         'minvert_v':
-            [7132, 'bool', 'False', None,
+            [7132, 'bool', False, None,
              'invert v-component',
              'Invert (negative) v-component array when loading results.'],
         
@@ -197,7 +197,7 @@ class results_modify(AddIn):
              None],
             
         'modification_exlude_mask':
-            [7290, 'bool', False, None,
+            [7290, 'bool', True, None,
              'exclude masked regions',
              'Exclude masked regions from modifications.'],
             
@@ -321,16 +321,16 @@ class results_modify(AddIn):
             'smoothn_each_pass':[
                 'smoothn_first_more',
                 'robust1',
-                'smoothn_val1'
+                'smoothn_val1',
             ],
             'smoothn':[
                 'robust',
                 'smoothn_val',
             ],
-            'offset_grid':[
-                'offset_x',
-                'offset_y',
-            ],
+            #'offset_grid':[
+            #    'offset_x',
+            #    'offset_y',
+            #],
             'modify_velocity':[
                 'modify_u',
                 'modify_v',

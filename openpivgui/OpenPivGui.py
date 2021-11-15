@@ -52,7 +52,7 @@ import sys
 import re
 import os
 
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 
 __licence__ = '''
 This program is free software: you can redistribute it and/or modify
@@ -343,6 +343,7 @@ class OpenPivGui(tk.Tk):
                 if 'u' in frame: del frame['u']
                 if 'v' in frame: del frame['v']
                 if 'tp' in frame: del frame['tp']
+                if 'xymask' in frame: del frame['xymask']
                 if 's2n' in frame: del frame['s2n']
                 if 'corr' in frame: del frame['corr']
 
@@ -351,6 +352,7 @@ class OpenPivGui(tk.Tk):
                 frame.create_dataset('u', data = results['u'])
                 frame.create_dataset('v', data = results['v'])
                 frame.create_dataset('tp', data = results['tp'])
+                frame.create_dataset('xymask', data = results['xymask'])
                 frame.create_dataset('s2n', data = results['s2n'])
                 frame.create_dataset('corr', data = results['corr'])
 
@@ -437,6 +439,7 @@ class OpenPivGui(tk.Tk):
                         frame.create_dataset('u', data = results.item().get('u'))
                         frame.create_dataset('v', data = results.item().get('v'))
                         frame.create_dataset('tp', data = results.item().get('tp'))
+                        frame.create_dataset('xymask', data = results['xymask'])
                         frame.create_dataset('s2n', data = results.item().get('s2n'))
 
                         if 'u_vld' in frame:
@@ -507,6 +510,7 @@ class OpenPivGui(tk.Tk):
                     if 'u' in frame: del frame['u']
                     if 'v' in frame: del frame['v']
                     if 'tp' in frame: del frame['tp']
+                    if 'xymask' in frame: del frame['xymask']
                     if 's2n' in frame: del frame['s2n']
                     if 'corr' in frame: del frame['corr']
 
@@ -515,6 +519,7 @@ class OpenPivGui(tk.Tk):
                     frame.create_dataset('u', data = results['u'])
                     frame.create_dataset('v', data = results['v'])
                     frame.create_dataset('tp', data = results['tp'])
+                    frame.create_dataset('xymask', data = results['xymask'])
                     frame.create_dataset('s2n', data = results['s2n'])
 
                     if 'u_vld' in frame:
@@ -620,13 +625,14 @@ class OpenPivGui(tk.Tk):
                 v = np.array(frame['v'])
                 
                 if len(mask_coords) > 0 and self.p['validation_exlude_mask'] == True:
-                    mask = coords_to_xymask(x, y, mask_coords)
+                    mask = np.array(frame['xymask'])
                 else: 
                     mask = np.ma.nomask               
  
                 flag = np.array(frame['tp']) # maybe rename this to flag?                
-                u, v, flag, isSame = self.postprocessing_methods['validate_results'](
-                    u, v, mask, flag, 
+                _, _, flag, isSame = self.postprocessing_methods['validate_results'](
+                    u.copy(), v.copy(),
+                    mask, flag, 
                     None, # no s2n validation
                     global_thresh       = self.p['vld_global_thr'],
                     global_minU         = self.p['MinU'],
@@ -640,12 +646,19 @@ class OpenPivGui(tk.Tk):
                     local_median        = self.p['vld_local_med'],
                     local_median_thresh = self.p['local_median_threshold'],
                     local_median_kernel = self.p['local_median_size'],
-                    replace             = self.p['repl'],
-                    replace_method      = self.p['repl_method'],
-                    replace_inter       = self.p['repl_iter'],
-                    replace_kernel      = self.p['repl_kernel'],
                 )
 
+                if self.p['repl'] == True:
+                    isSame = False
+                    u, v, flag = self.postprocessing_methods['replace_results'](
+                        u, v,
+                        mask = mask,
+                        flag = flag,
+                        replace_method = self.p['repl_method'],
+                        replace_inter  = self.p['repl_iter'],
+                        replace_kernel = self.p['repl_kernel'],
+                    )
+                        
                 if 'u_vld' in frame:
                     del frame['u_vld']
                     del frame['v_vld']
@@ -734,11 +747,10 @@ class OpenPivGui(tk.Tk):
                 
                 x = np.array(frame['x']) # incase if there is a different roi somewhere, it won't cause bad errors
                 y = np.array(frame['y'])
-                
                 if len(mask_coords) > 0 and self.p['modification_exlude_mask'] == True:
-                    mask = coords_to_xymask(x, y, mask_coords)
+                    mask = np.array(frame['xymask'])
                 else:
-                    mask = np.ma.nomask  
+                    mask = np.zeros_like(x)  
                     
                 if 'u_vld' in frame:
                     u = np.array(frame['u_vld'])
@@ -746,7 +758,7 @@ class OpenPivGui(tk.Tk):
                 else:
                     u = np.array(frame['u'])
                     v = np.array(frame['v'])
-                
+                    
                 _, _, u, v, isSame = self.postprocessing_methods['modify_results'](
                     x, y, u, v, mask,
                     modify_velocity = self.p['modify_velocity'],
@@ -878,7 +890,8 @@ class OpenPivGui(tk.Tk):
             frame.create_dataset('u', data = u)
             frame.create_dataset('v', data = v)
             frame.create_dataset('tp', data = flag)
-            frame.create_dataset('s2n', data = s2n)            
+            frame.create_dataset('s2n', data = s2n)   
+            frame.create_dataset('xymask', data = np.zeros_like(x))
         #except Exception as e:
         #    print("Failed to average results.\nReason: " + str(e))
         #self.enable_widgets()
@@ -1186,9 +1199,9 @@ class OpenPivGui(tk.Tk):
                 defaultextension = '.json',
                 filetypes = [('json', '*.json'), ]
             )))
-        submenu.add_command(label='main figure', command = lambda: self.selection(26))
-        submenu.add_command(label='pre-processed images', command = lambda: self.selection(28))
-        submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(27))
+        submenu.add_command(label='main figure', command = lambda: self.selection(27))
+        submenu.add_command(label='pre-processed images', command = lambda: self.selection(29))
+        submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(28))
         #submenu.add_command(label='TecPlot')
         #submenu.add_command(label='ParaView')
         options.add_cascade(label='Export', menu=submenu)
@@ -1199,9 +1212,9 @@ class OpenPivGui(tk.Tk):
         options.add_cascade(label='Reset', menu=submenu)
         options.add_separator()
         submenu = tk.Menu(options, tearoff=0)
-        submenu.add_command(label='images to movie', command = lambda: self.selection(29))
-        submenu.add_command(label='movie to images', command = lambda: self.selection(30))
-        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(31))
+        submenu.add_command(label='images to movie', command = lambda: self.selection(30))
+        submenu.add_command(label='movie to images', command = lambda: self.selection(31))
+        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(32))
         options.add_cascade(label='Convert', menu=submenu)
         options.add_separator()
         options.add_command(label='Exit', command=self.destroy)
@@ -1251,34 +1264,36 @@ class OpenPivGui(tk.Tk):
         postproc.config(menu=options)
         options.add_command(label='Validate components (vector based)',
                              command=lambda: self.selection(15))
-        options.add_command(label='Modify components',
+        options.add_command(label='Replace components',
                              command=lambda: self.selection(16))
-        options.add_command(label='Derive components',
+        options.add_command(label='Modify components',
                              command=lambda: self.selection(17))
+        options.add_command(label='Derive components',
+                             command=lambda: self.selection(18))
         postproc.pack(side='left', fill='x')
 
         plot = ttk.Menubutton(f, text='Data exploration')
         options = tk.Menu(plot, tearoff=0)
         plot.config(menu=options)
         options.add_command(
-            label='Vectors', command=lambda: self.selection(18))
+            label='Vectors', command=lambda: self.selection(19))
         options.add_command(
-            label='Contours', command=lambda: self.selection(19))
+            label='Contours', command=lambda: self.selection(20))
         options.add_command(
-            label='Streamlines', command=lambda: self.selection(20))
+            label='Streamlines', command=lambda: self.selection(21))
         options.add_command(
-            label='Statistics', command=lambda: self.selection(21))
+            label='Statistics', command=lambda: self.selection(22))
         options.add_command(
-            label='Extractions', command=lambda: self.selection(22))
+            label='Extractions', command=lambda: self.selection(23))
         options.add_command(
-            label='Preferences', command=lambda: self.selection(23))
+            label='Preferences', command=lambda: self.selection(24))
         plot.pack(side='left', fill='x')
         
         u_func = ttk.Menubutton(f, text='User function')
         options = tk.Menu(u_func, tearoff=0)
         u_func.config(menu=options)
         options.add_command(label='Show user function',
-                             command=lambda: self.selection(25))
+                             command=lambda: self.selection(26))
         options.add_command(label='Execute user function',
                              command=self.text_function)
         u_func.pack(side='left', fill='x')
@@ -1287,7 +1302,7 @@ class OpenPivGui(tk.Tk):
         options = tk.Menu(lab_func, tearoff=0)
         lab_func.config(menu=options)
         options.add_command(label='Show lab book',
-                             command=lambda: self.selection(24))
+                             command=lambda: self.selection(25))
         lab_func.pack(side='left', fill='x')
 
         usage_func = ttk.Menubutton(f, text='Usage')
@@ -1679,7 +1694,10 @@ class OpenPivGui(tk.Tk):
 
                             if flag[xint, yint] == 0: 
                                 flag = 'valid'
-                            else: flag = 'invalid'
+                            elif flag[xint, yint] == 1: 
+                                flag = 'invalid'
+                            elif flag[xint, yint] == 2: # soon, there would be flags for other replacement methods
+                                flag = 'interpolated'
                             if self.p['debug']:
                                 print(f'x index: {xint}\ny index: {yint}')
                                 print(f'axis limits: ({xmin},{xmax}), ({ymin}, {ymax})')
@@ -2297,6 +2315,13 @@ class OpenPivGui(tk.Tk):
                 print(f'Created frame {i}')
                 self.process_type.config(text = f'Created frame {i}')
 
+            self.progressbar.stop()
+            self.progressbar.config(
+                mode = 'indeterminate', 
+            )
+            self.progressbar['value'] = 0
+            self.progressbar['maximum'] = 100
+        
             if 'frames' in img_grp:
                 del img_grp['frames']
             img_grp.create_dataset('frames', data = self.p['fnames'])
@@ -4046,7 +4071,11 @@ class OpenPivGui(tk.Tk):
             del self.session['images']['frames']
             self.session['images'].create_dataset('frames', data = self.p['fnames'])
         if update_plot:
-            self.show(self.p['files_' + self.toggle][self.index])
+            self.index = 0
+            self.num_of_frames.config(text = ('0/'+str(len(self.p['files_a']) - 1)))
+            self.mask_load_applied()
+            self.show(self.p['files_' + self.toggle][0])
+            print('Reason: moved to a different frame')
         print('Cleared results for all frames')
     
     

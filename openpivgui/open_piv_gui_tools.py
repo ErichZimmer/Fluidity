@@ -263,6 +263,7 @@ def get_selection(selection, max_):
             ))
     return select_frames
     
+    
 def line2profile(
     array,
     x_coords,

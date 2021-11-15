@@ -260,12 +260,10 @@ def vector(data,
     '''
           
     try:
-        invalid = data[4].astype('bool')
+        flag = data[4]
     except:
-        invalid = np.asarray([True for i in range(len(data[0]))])
+        flag = np.zeros_like(x)
 
-    # tilde means invert:
-    valid = ~invalid
     ax = axes
     
     x = data[0]
@@ -277,6 +275,7 @@ def vector(data,
     y = y[::parameter['nthArrY'], ::parameter['nthArrX']] 
     u = u[::parameter['nthArrY'], ::parameter['nthArrX']]
     v = v[::parameter['nthArrY'], ::parameter['nthArrX']]
+    flag = flag[::parameter['nthArrY'], ::parameter['nthArrX']]
     
     if len(mask_coords) > 0:
         mask = coords_to_xymask(x, y, mask_coords)
@@ -293,27 +292,12 @@ def vector(data,
                 linestyle = '',
                 zorder=1,
             )
-
-    invalid = invalid[::parameter['nthArrY'], ::parameter['nthArrX']]
-    valid = valid[::parameter['nthArrY'], ::parameter['nthArrX']]
         
     if parameter['uniform_vector_color']:
-        ax.quiver(x[invalid],
-                  y[invalid],
-                  u[invalid],
-                  v[invalid],
-                  color      = parameter['invalid_color'],
-                  label      = 'invalid', 
-                  headwidth  = parameter['vec_head_width'],
-                  headlength = parameter['vec_head_len'],
-                  pivot      = parameter['vec_pivot'],
-                  **kw,
-                  zorder = 2)
-
-        ax.quiver(x[valid],
-                  y[valid],
-                  u[valid],
-                  v[valid],
+        ax.quiver(x[flag == 0],
+                  y[flag == 0],
+                  u[flag == 0],
+                  v[flag == 0],
                   color      = parameter['valid_color'],
                   label      = 'valid', 
                   headwidth  = parameter['vec_head_width'],
@@ -321,6 +305,30 @@ def vector(data,
                   pivot      = parameter['vec_pivot'],
                   zorder     = 3,
                   **kw)
+        
+        ax.quiver(x[flag == 1],
+                  y[flag == 1],
+                  u[flag == 1],
+                  v[flag == 1],
+                  color      = parameter['invalid_color'],
+                  label      = 'invalid', 
+                  headwidth  = parameter['vec_head_width'],
+                  headlength = parameter['vec_head_len'],
+                  pivot      = parameter['vec_pivot'],
+                  **kw,
+                  zorder = 2)
+        
+        ax.quiver(x[flag == 2],
+                  y[flag == 2],
+                  u[flag == 2],
+                  v[flag == 2],
+                  color      = parameter['invalid_color'],
+                  label      = 'invalid', 
+                  headwidth  = parameter['vec_head_width'],
+                  headlength = parameter['vec_head_len'],
+                  pivot      = parameter['vec_pivot'],
+                  **kw,
+                  zorder = 2)
     else:
         
         cmap = get_cmap(parameter['color_map'])

@@ -58,6 +58,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
         disp_off = 0,
         bg_a = [],
         bg_b = [],
+        precomp_fp = [],
         ensemble = False,
         parallel = False, 
     ):
@@ -73,6 +74,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
         self.files_b = files_b
         self.bg_a = bg_a
         self.bg_b = bg_b
+        self.precomp_fp = precomp_fp
         self.disp_off = disp_off
         self.parallel = parallel
         self.file_path = params.path
@@ -287,7 +289,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     break;
             print('Using python wrapper of FFTW library')
             '''
-            print('Using FFTW library')
+            print('Using python wrapper of FFTW library')
         except:
             from scipy.fft import rfft2, irfft2
             print('Using PocketFFT library')
@@ -424,39 +426,42 @@ class MultiProcessing(piv_tls.Multiprocesser):
         else:
             corr_windowing = self.parameter['window_weighting']
             
-        if self.parameter['algorithm'] not in [
-            'I messed up here'
-        ]:
+        # setup custom windowing
+        try:
+            corr_window = [int(self.parameter['corr_window_1']),
+                           int(self.parameter['corr_window_1'])]
+        except:
+            corr_window = [
+                    int(list(self.parameter['corr_window_1'].split(','))[0]),
+                    int(list(self.parameter['corr_window_1'].split(','))[1])
+            ]
+        try:
+            overlap = [int(self.parameter['overlap_window_1']),
+                       int(self.parameter['overlap_window_1'])]
+        except:
+            overlap = [
+                int(list(self.parameter['overlap_window_1'].split(','))[0]),
+                int(list(self.parameter['overlap_window_1'].split(','))[1])
+            ]
+            
+        passes = 1
+        for i in range(2, 7):
+            if self.parameter['pass_%1d' % i]:
+                passes += 1
+            else:
+                break;
 
-            # setup custom windowing
-            try:
-                corr_window = [int(self.parameter['corr_window_1']),
-                               int(self.parameter['corr_window_1'])]
-            except:
-                corr_window = [
-                        int(list(self.parameter['corr_window_1'].split(','))[0]),
-                        int(list(self.parameter['corr_window_1'].split(','))[1])
-                ]
-            try:
-                overlap = [int(self.parameter['overlap_window_1']),
-                           int(self.parameter['overlap_window_1'])]
-            except:
-                overlap = [
-                    int(list(self.parameter['overlap_window_1'].split(','))[0]),
-                    int(list(self.parameter['overlap_window_1'].split(','))[1])
-                ]
-            passes = 1
-            for i in range(2, 7):
-                if self.parameter['pass_%1d' % i]:
-                    passes += 1
-                else:
-                    break;
-            
-            overlap_percent = [overlap[0] / corr_window[0], overlap[1] / corr_window[1]]
-            
-            print('Evaluating frame: {}'.format(counter + self.disp_off))
-            # evaluation first pass
-            start = time.time() 
+        overlap_percent = [overlap[0] / corr_window[0], overlap[1] / corr_window[1]]
+
+        print('Evaluating frame: {}'.format(counter + self.disp_off))
+        # evaluation first pass
+        start = time.time() 
+        if len(self.precomp_fp) > 0 and passes > 1:
+            x = self.precomp_fp[0]
+            y = self.precomp_fp[1]
+            u = self.precomp_fp[2]
+            v = self.precomp_fp[3]
+        else:
             limit_peak_search = False
             peak_distance = None
             if self.parameter['limit_peak_search_each']:
@@ -467,7 +472,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
             if passes == 1 and self.parameter['limit_peak_search_last'] == True:
                 limit_peak_search = True
                 peak_distance = self.parameter['limit_peak_search_distance_last']
-              
+
             if self.parameter['do_s2n']:
                 if passes == 1:
                     do_s2n = True
@@ -496,28 +501,28 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 rfft2  = self.rfft_plans['pass_1'],
                 irfft2 = self.irfft_plans['pass_1'],
             )
-
+            if self.parameter['exclude_masked_regions'] == True:
+                # applying mask(s)
+                if len(mask_coords) > 0:
+                    xymask = coords_to_xymask(x, y, mask_coords).reshape(x.shape)
+                print('Created mask')
+            else:
+                xymask = np.zeros_like(x)
+                
             # validating first pass, signal to noise calc.
             if passes != 1 or self.parameter['validate_last_pass'] == True:
                 startn = time.time()
-                if self.parameter['exclude_masked_regions'] == True:
-                    # applying mask(s)
-                    if len(mask_coords) > 0:
-                        xymask = coords_to_xymask(x, y, mask_coords).reshape(x.shape)
-                    print('Created mask')
-                else:
-                    xymask = np.ma.nomask
-                mask = np.full_like(x, 0)
+                flag = np.full_like(x, 0)
                 if self.parameter['fp_peak2peak_validation'] == True:
                     sig2noise = piv_prc.vectorized_sig2noise_ratio(
                         corr, 
                         sig2noise_method='peak2peak', 
                         width = self.parameter['fp_peak2peak_mask_width']
                     ).reshape(u.shape)
-                    u, v, mask, _ = self.postproc['validate_results'](
+                    u, v, flag, _ = self.postproc['validate_results'](
                         u, v, 
                         mask = xymask,
-                        flag = mask,
+                        flag = flag,
                         s2n = sig2noise, 
                         s2n_val = True,
                         s2n_thresh = self.parameter['fp_peak2peak_threshold'],
@@ -525,7 +530,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         global_std = False,
                         z_score = False,
                         local_median = False,
-                        replace = False,
                     )
                     print('Mean peak-to-peak ratio: '+str(sig2noise.mean()))
                 if self.parameter['fp_peak2mean_validation'] == True:
@@ -534,10 +538,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         sig2noise_method = 'peak2mean', 
                         width = self.parameter['fp_peak2peak_mask_width']
                     ).reshape(u.shape)
-                    u, v, mask, _ = self.postproc['validate_results'](
+                    u, v, flag, _ = self.postproc['validate_results'](
                         u, v, 
                         mask = xymask,
-                        flag = mask,
+                        flag = flag,
                         s2n = sig2noise, 
                         s2n_val = True,
                         s2n_thresh = self.parameter['fp_peak2mean_threshold'],
@@ -545,14 +549,13 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         global_std = False,
                         z_score = False,
                         local_median = False,
-                        replace = False,
                     )
                     print('Mean peak-to-mean ratio: '+str(sig2noise.mean()))
                 # validate other passes
-                u, v, mask, _ = self.postproc['validate_results'](
+                u, v, flag, _ = self.postproc['validate_results'](
                     u, v,
                     xymask,
-                    flag = mask,
+                    flag = flag,
                     global_thresh       = self.parameter['fp_vld_global_threshold'],
                     global_minU         = self.parameter['fp_MinU'],
                     global_maxU         = self.parameter['fp_MaxU'],
@@ -565,11 +568,16 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     local_median        = self.parameter['fp_local_med_threshold'],
                     local_median_thresh = self.parameter['fp_local_med'],
                     local_median_kernel = self.parameter['fp_local_med_size'],
-                    replace             = self.parameter['pass_repl'],
-                    replace_method      = self.parameter['pass_repl_method'],
-                    replace_inter       = self.parameter['pass_repl_iter'],
-                    replace_kernel      = self.parameter['pass_repl_kernel'],
                 )
+                if self.parameter['pass_repl'] == True:
+                    u, v, flag = self.postproc['replace_results'](
+                        u, v,
+                        mask = xymask,
+                        flag = flag,
+                        replace_method      = self.parameter['pass_repl_method'],
+                        replace_inter       = self.parameter['pass_repl_iter'],
+                        replace_kernel      = self.parameter['pass_repl_kernel'],
+                    )
                 print(f'Validated pass 1 of frame: {counter + self.disp_off} '+ 
                       f'({_round(time.time() - startn, 3)} second(s))')           
 
@@ -592,189 +600,188 @@ class MultiProcessing(piv_tls.Multiprocesser):
             print(f"window size (y,x): {corr_window[0]}x{corr_window[1]} pixels")
             print(f'overlap (y,x): {overlap[0]}x{overlap[1]} pixels' , '\n')  
 
-            # evaluation of all other passes
-            if passes != 1:
-                iterations = passes - 1
-                for i in range(2, passes + 1):
-                    if self.parameter['analysis'] != True:
-                        raise Exception('Cancled analysis via exception')
-                    # setting up the windowing of each pass
+        # evaluation of all other passes
+        if passes != 1:
+            iterations = passes - 1
+            for i in range(2, passes + 1):
+                if self.parameter['analysis'] != True:
+                    raise Exception('Cancled analysis via exception')
+                # setting up the windowing of each pass
+                try:
+                    corr_window = [int(self.parameter[f'corr_window_{i}']),
+                                   int(self.parameter[f'corr_window_{i}'])]
+                except:
+                    corr_window = [
+                            int(list(self.parameter[f'corr_window_{i}'].split(','))[0]),
+                            int(list(self.parameter[f'corr_window_{i}'].split(','))[1])
+                    ]
+                if self.parameter['update_overlap']:
+                    overlap = [int(corr_window[0] * overlap_percent[0]),
+                               int(corr_window[1] * overlap_percent[1])]
+                else:
                     try:
-                        corr_window = [int(self.parameter[f'corr_window_{i}']),
-                                       int(self.parameter[f'corr_window_{i}'])]
+                        overlap = [int(self.parameter[f'overlap_window_{i}']),
+                                   int(self.parameter[f'overlap_window_{i}'])]
                     except:
-                        corr_window = [
-                                int(list(self.parameter[f'corr_window_{i}'].split(','))[0]),
-                                int(list(self.parameter[f'corr_window_{i}'].split(','))[1])
+                        overlap = [
+                            int(list(self.parameter[f'overlap_window_{i}'].split(','))[0]),
+                            int(list(self.parameter[f'overlap_window_{i}'].split(','))[1])
                         ]
-                    if self.parameter['update_overlap']:
-                        overlap = [int(corr_window[0] * overlap_percent[0]),
-                                   int(corr_window[1] * overlap_percent[1])]
-                    else:
-                        try:
-                            overlap = [int(self.parameter[f'overlap_window_{i}']),
-                                       int(self.parameter[f'overlap_window_{i}'])]
-                        except:
-                            overlap = [
-                                int(list(self.parameter[f'overlap_window_{i}'].split(','))[0]),
-                                int(list(self.parameter[f'overlap_window_{i}'].split(','))[1])
-                            ]
-                    
-                    limit_peak_search = False
-                    peak_distance = None
-            
-                    if self.parameter['limit_peak_search_each']:
-                        limit_peak_search = True
-                        if self.parameter['limit_peak_search_auto_each'] != True:
-                            peak_distance = self.parameter['limit_peak_search_distance_each']
-                            
-                    if i == passes and self.parameter['limit_peak_search_last'] == True:
-                        limit_peak_search = True
-                        peak_distance = self.parameter['limit_peak_search_distance_last']
-                            
-                    if self.parameter['do_s2n']:
-                        if passes == i:
-                            do_s2n = True
-                        else:
-                            do_s2n = False
+
+                limit_peak_search = False
+                peak_distance = None
+
+                if self.parameter['limit_peak_search_each']:
+                    limit_peak_search = True
+                    if self.parameter['limit_peak_search_auto_each'] != True:
+                        peak_distance = self.parameter['limit_peak_search_distance_each']
+
+                if i == passes and self.parameter['limit_peak_search_last'] == True:
+                    limit_peak_search = True
+                    peak_distance = self.parameter['limit_peak_search_distance_last']
+
+                if self.parameter['do_s2n']:
+                    if passes == i:
+                        do_s2n = True
                     else:
                         do_s2n = False
-                    x, y, u, v, s2n, corr = pivware.multipass(
-                        frame_a.astype(img_dtype), frame_b.astype(img_dtype),
-                        corr_window,
-                        overlap,
-                        passes, # number of iterations 
-                        i, # current iteration 
-                        x, y, u, v,
-                        normalize_intensity        = self.parameter['normalize_intensity'],
-                        algorithm                  = self.parameter['algorithm'],
-                        interpolation_order1       = self.parameter['grid_interpolation_order'],
-                        interpolation_order2       = self.parameter['image_interpolation_order'],
-                        interpolation_order3       = self.parameter['image_deformation_order'],
-                        correlation_method         = self.parameter['corr_method'],
-                        subpixel_method            = self.parameter['subpixel_method'],
-                        offset_correlation         = self.parameter['offset_corr_subpix'],
-                        deformation_method         = self.parameter['deformation_method'],
-                        weight                     = corr_windowing,
-                        disable_autocorrelation    = self.parameter['disable_autocorrelation'],
-                        autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
-                        limit_peak_search          = limit_peak_search,
-                        limit_peak_search_distance = peak_distance,
-                        do_sig2noise               = do_s2n,
-                        sig2noise_method           = self.parameter['s2n_method'],
-                        sig2noise_mask             = self.parameter['s2n_mask'],
-                        rfft2 = self.rfft_plans[f'pass_{1}'],
-                        irfft2 = self.irfft_plans[f'pass_{1}'],
+                else:
+                    do_s2n = False
+                x, y, u, v, s2n, corr = pivware.multipass(
+                    frame_a.astype(img_dtype), frame_b.astype(img_dtype),
+                    corr_window,
+                    overlap,
+                    passes, # number of iterations 
+                    i, # current iteration 
+                    x, y,
+                    np.ma.masked_array(u, mask = xymask),
+                    np.ma.masked_array(v, mask = xymask),
+                    normalize_intensity        = self.parameter['normalize_intensity'],
+                    algorithm                  = self.parameter['algorithm'],
+                    interpolation_order1       = self.parameter['grid_interpolation_order'],
+                    interpolation_order2       = self.parameter['image_interpolation_order'],
+                    interpolation_order3       = self.parameter['image_deformation_order'],
+                    correlation_method         = self.parameter['corr_method'],
+                    subpixel_method            = self.parameter['subpixel_method'],
+                    offset_correlation         = self.parameter['offset_corr_subpix'],
+                    deformation_method         = self.parameter['deformation_method'],
+                    weight                     = corr_windowing,
+                    disable_autocorrelation    = self.parameter['disable_autocorrelation'],
+                    autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
+                    limit_peak_search          = limit_peak_search,
+                    limit_peak_search_distance = peak_distance,
+                    do_sig2noise               = do_s2n,
+                    sig2noise_method           = self.parameter['s2n_method'],
+                    sig2noise_mask             = self.parameter['s2n_mask'],
+                    rfft2 = self.rfft_plans[f'pass_{1}'],
+                    irfft2 = self.irfft_plans[f'pass_{1}'],
+                )
+                if i != passes or self.parameter['validate_last_pass'] == True:
+                    startn = time.time()
+                    if self.parameter['exclude_masked_regions'] == True:
+                        # applying mask(s)
+                        if len(mask_coords) > 0:
+                            xymask = coords_to_xymask(x, y, mask_coords)
+                            xymask.reshape(x.shape)
+                            print('Created mask')
+                    else:
+                        xymask = np.zeros_like(x)
+                    flag = np.full_like(x, 0)
+                    if self.parameter['sp_peak2peak_validation'] == True:
+                        sig2noise = piv_prc.vectorized_sig2noise_ratio(
+                            corr, 
+                            sig2noise_method='peak2peak', 
+                            width = self.parameter['sp_peak2peak_mask_width']
+                        ).reshape(u.shape)
+                        u, v, flag, _ = self.postproc['validate_results'](
+                            u, v, 
+                            mask = xymask,
+                            flag = flag,
+                            s2n = sig2noise, 
+                            s2n_val = True,
+                            s2n_thresh = self.parameter['sp_peak2peak_threshold'],
+                            global_thresh = False,
+                            global_std = False,
+                            z_score = False,
+                            local_median = False,
+                        )
+                        print('Mean peak-to-peak ratio: '+str(sig2noise.mean()))
+                    if self.parameter['sp_peak2mean_validation'] == True:
+                        sig2noise = piv_prc.vectorized_sig2noise_ratio(
+                            corr, 
+                            sig2noise_method = 'peak2mean', 
+                            width = self.parameter['sp_peak2peak_mask_width']
+                        ).reshape(u.shape)
+                        u, v, flag, _ = self.postproc['validate_results'](
+                            u, v, 
+                            mask = xymask,
+                            flag = flag,
+                            s2n = sig2noise, 
+                            s2n_val = True,
+                            s2n_thresh = self.parameter['sp_peak2mean_threshold'],
+                            global_thresh = False,
+                            global_std = False,
+                            z_score = False,
+                            local_median = False,
+                        )
+                        print('Mean peak-to-mean ratio: '+str(sig2noise.mean()))
+                    # validate other passes
+                    u, v, flag, _ = self.postproc['validate_results'](
+                        u, v,
+                        xymask,
+                        flag = flag,
+                        global_thresh       = self.parameter['sp_vld_global_threshold'],
+                        global_minU         = self.parameter['sp_MinU'],
+                        global_maxU         = self.parameter['sp_MaxU'],
+                        global_minV         = self.parameter['sp_MinV'],
+                        global_maxV         = self.parameter['sp_MaxV'],
+                        global_std          = self.parameter['sp_vld_global_threshold'],
+                        global_std_thresh   = self.parameter['sp_std_threshold'],
+                        z_score             = self.parameter['sp_zscore'],
+                        z_score_thresh      = self.parameter['sp_zscore_threshold'],
+                        local_median        = self.parameter['sp_local_med_validation'],
+                        local_median_thresh = self.parameter['sp_local_med'],
+                        local_median_kernel = self.parameter['sp_local_med_size'],
                     )
-                    if i != passes or self.parameter['validate_last_pass'] == True:
-                        startn = time.time()
-                        if self.parameter['exclude_masked_regions'] == True:
-                            # applying mask(s)
-                            if len(mask_coords) > 0:
-                                xymask = coords_to_xymask(x, y, mask_coords)
-                                xymask.reshape(x.shape)
-                                print('Created mask')
-                        else:
-                            xymask = np.ma.nomask
-                        mask = np.full_like(x, 0)
-                        if self.parameter['sp_peak2peak_validation'] == True:
-                            sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                                corr, 
-                                sig2noise_method='peak2peak', 
-                                width = self.parameter['sp_peak2peak_mask_width']
-                            ).reshape(u.shape)
-                            u, v, mask, _ = self.postproc['validate_results'](
-                                u, v, 
-                                mask = xymask,
-                                flag = mask,
-                                s2n = sig2noise, 
-                                s2n_val = True,
-                                s2n_thresh = self.parameter['sp_peak2peak_threshold'],
-                                global_thresh = False,
-                                global_std = False,
-                                z_score = False,
-                                local_median = False,
-                                replace = False,
-                            )
-                            print('Mean peak-to-peak ratio: '+str(sig2noise.mean()))
-                        if self.parameter['sp_peak2mean_validation'] == True:
-                            sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                                corr, 
-                                sig2noise_method = 'peak2mean', 
-                                width = self.parameter['sp_peak2peak_mask_width']
-                            ).reshape(u.shape)
-                            u, v, mask, _ = self.postproc['validate_results'](
-                                u, v, 
-                                mask = xymask,
-                                flag = mask,
-                                s2n = sig2noise, 
-                                s2n_val = True,
-                                s2n_thresh = self.parameter['sp_peak2mean_threshold'],
-                                global_thresh = False,
-                                global_std = False,
-                                z_score = False,
-                                local_median = False,
-                                replace = False,
-                            )
-                            print('Mean peak-to-mean ratio: '+str(sig2noise.mean()))
-                        # validate other passes
-                        u, v, mask, _ = self.postproc['validate_results'](
+                    if self.parameter['pass_repl'] == True:
+                        u, v, flag = self.postproc['replace_results'](
                             u, v,
-                            xymask,
-                            flag = mask,
-                            global_thresh       = self.parameter['sp_vld_global_threshold'],
-                            global_minU         = self.parameter['sp_MinU'],
-                            global_maxU         = self.parameter['sp_MaxU'],
-                            global_minV         = self.parameter['sp_MinV'],
-                            global_maxV         = self.parameter['sp_MaxV'],
-                            global_std          = self.parameter['sp_vld_global_threshold'],
-                            global_std_thresh   = self.parameter['sp_std_threshold'],
-                            z_score             = self.parameter['sp_zscore'],
-                            z_score_thresh      = self.parameter['sp_zscore_threshold'],
-                            local_median        = self.parameter['sp_local_med_validation'],
-                            local_median_thresh = self.parameter['sp_local_med'],
-                            local_median_kernel = self.parameter['sp_local_med_size'],
-                            replace             = self.parameter['pass_repl'],
+                            mask = xymask,
+                            flag = flag,
                             replace_method      = self.parameter['pass_repl_method'],
                             replace_inter       = self.parameter['pass_repl_iter'],
                             replace_kernel      = self.parameter['pass_repl_kernel'],
                         )
-                        print(f'Validated pass {i} of frame: {counter + self.disp_off} '+ 
-                              f'({_round(time.time() - startn, 3)} second(s))')           
-                        startn = time.time()
-                        # smoothning each individual pass if 'each pass' is selected
-                        if self.parameter['smoothn_each_pass']:
-                            _, _, u, v, _ = self.postproc['modify_results'](
-                                x, y, u, v,
-                                smooth = True,
-                                strength = s,
-                                robust = self.parameter['robust1']
-                            ) 
-                            print(f'Smoothned pass {i} for frame: {counter + self.disp_off} '+
-                                  f'({_round(time.time() - startn, 3)} second(s))')   
-                    print(f'Finished pass {i} for frame: {counter + self.disp_off}')
-                    print(f"window size (y,x): {corr_window[0]}x{corr_window[1]} pixels")
-                    print(f'overlap (y,x): {overlap[0]}x{overlap[1]} pixels', '\n')  
-                    iterations -= 1
-            if self.parameter['validate_last_pass'] != True:
-                mask = np.full_like(x, 0)
-            mask[u == np.nan] = 1
-            mask[v == np.nan] = 1
+                    print(f'Validated pass {i} of frame: {counter + self.disp_off} '+ 
+                          f'({_round(time.time() - startn, 3)} second(s))')           
+                    startn = time.time()
+                    # smoothning each individual pass if 'each pass' is selected
+                    if self.parameter['smoothn_each_pass']:
+                        _, _, u, v, _ = self.postproc['modify_results'](
+                            x, y, u, v,
+                            smooth = True,
+                            strength = s,
+                            robust = self.parameter['robust1']
+                        ) 
+                        print(f'Smoothned pass {i} for frame: {counter + self.disp_off} '+
+                              f'({_round(time.time() - startn, 3)} second(s))')   
+                print(f'Finished pass {i} for frame: {counter + self.disp_off}')
+                print(f"window size (y,x): {corr_window[0]}x{corr_window[1]} pixels")
+                print(f'overlap (y,x): {overlap[0]}x{overlap[1]} pixels', '\n')  
+                iterations -= 1
+        if self.parameter['validate_last_pass'] != True:
+            flag = np.full_like(x, 0)
+        flag[u == np.nan] = 1
+        flag[v == np.nan] = 1
                     
-        typevector = mask
         if self.parameter['algorithm'].lower() == 'fft-based convolution':
             u *= -1
             v *= -1
             
         if self.parameter['analysis'] != True:
             raise Exception('Cancled analysis via exception')
-        # applying mask(s)
-        if len(mask_coords) > 0:
-            xymask = coords_to_xymask(x, y, mask_coords).reshape(x.shape)
-            u = np.ma.masked_array(u, xymask)
-            v = np.ma.masked_array(v, xymask) 
-
         end = time.time() 
+        
         # save data to dictionary.
         try:
             int(roi_xmin) 
@@ -784,7 +791,11 @@ class MultiProcessing(piv_tls.Multiprocesser):
             roi_present = True
         except:
             roi_present = False
-    
+        if len(mask_coords) > 0:
+            xymask = coords_to_xymask(x, y, mask_coords)
+            xymask.reshape(x.shape)
+            print('Created mask')
+                        
         results = {}
         results['processed'] = True
         results['roi_present'] = roi_present
@@ -795,8 +806,9 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['y'] = y
         results['u'] = u
         results['v'] = -v 
-        results['tp'] = typevector
+        results['tp'] = flag
         results['s2n'] = s2n
+        results['xymask'] = xymask
             
         # additional information of evaluation
         time_per_vec = _round((((end - start) * 1000) / u.size), 3)
@@ -1030,7 +1042,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
             #else:
             xymask = np.ma.nomask
                 
-            mask = np.full_like(x, 0)
+            flag = np.full_like(x, 0)
             if self.parameter['fp_peak2peak_validation'] == True:
                 sig2noise = piv_prc.vectorized_sig2noise_ratio(
                     corr_avg, 
@@ -1040,7 +1052,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 u, v, mask, _ = self.postproc['validate_results'](
                     u, v, 
                     mask = xymask,
-                    flag = mask,
+                    flag = flag,
                     s2n = sig2noise, 
                     s2n_val = True,
                     s2n_thresh = self.parameter['fp_peak2peak_threshold'],
@@ -1048,7 +1060,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     global_std = False,
                     z_score = False,
                     local_median = False,
-                    replace = False,
                 )
                 print('Mean peak-to-peak ratio: '+str(sig2noise.mean()))
                 
@@ -1058,10 +1069,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     sig2noise_method = 'peak2mean', 
                     width = self.parameter['fp_peak2peak_mask_width']
                 ).reshape(u.shape)
-                u, v, mask, _ = self.postproc['validate_results'](
+                u, v, flag, _ = self.postproc['validate_results'](
                     u, v, 
                     mask = xymask,
-                    flag = mask,
+                    flag = flag,
                     s2n = sig2noise, 
                     s2n_val = True,
                     s2n_thresh = self.parameter['fp_peak2mean_threshold'],
@@ -1069,7 +1080,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     global_std = False,
                     z_score = False,
                     local_median = False,
-                    replace = False,
                 )
                 print('Mean peak-to-mean ratio: '+str(sig2noise.mean()))
                 
@@ -1077,7 +1087,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
             u, v, mask, _ = self.postproc['validate_results'](
                 u, v,
                 xymask,
-                flag = mask,
+                flag = flag,
                 global_thresh       = self.parameter['fp_vld_global_threshold'],
                 global_minU         = self.parameter['fp_MinU'],
                 global_maxU         = self.parameter['fp_MaxU'],
@@ -1090,11 +1100,17 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 local_median        = self.parameter['fp_local_med_threshold'],
                 local_median_thresh = self.parameter['fp_local_med'],
                 local_median_kernel = self.parameter['fp_local_med_size'],
-                replace             = self.parameter['pass_repl'],
-                replace_method      = self.parameter['pass_repl_method'],
-                replace_inter       = self.parameter['pass_repl_iter'],
-                replace_kernel      = self.parameter['pass_repl_kernel'],
             )
+            if self.parameter['pass_repl'] == True:
+                u, v,
+                u, v, flag = self.postproc['replace_results'](
+                    u, v,
+                    mask = xymask,
+                    flag = flag,
+                    replace_method      = self.parameter['pass_repl_method'],
+                    replace_inter       = self.parameter['pass_repl_iter'],
+                    replace_kernel      = self.parameter['pass_repl_kernel'],
+                )
             print('Validated pass 1') 
 
             # smoothning  before deformation if 'each pass' is selected
@@ -1346,17 +1362,17 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 if i != passes or self.parameter['validate_last_pass'] == True:
                     # applying mask(s)
                     xymask = np.ma.nomask
-                    mask = np.full_like(x, 0)
+                    flag = np.full_like(x, 0)
                     if self.parameter['sp_peak2peak_validation'] == True:
                         sig2noise = piv_prc.vectorized_sig2noise_ratio(
                             corr_avg, 
                             sig2noise_method='peak2peak', 
                             width = self.parameter['sp_peak2peak_mask_width']
                         ).reshape(u.shape)
-                        u, v, mask, _ = self.postproc['validate_results'](
+                        u, v, flag, _ = self.postproc['validate_results'](
                             u, v, 
                             mask = xymask,
-                            flag = mask,
+                            flag = flag,
                             s2n = sig2noise, 
                             s2n_val = True,
                             s2n_thresh = self.parameter['sp_peak2peak_threshold'],
@@ -1364,7 +1380,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                             global_std = False,
                             z_score = False,
                             local_median = False,
-                            replace = False,
                         )
                         print('Mean peak-to-peak ratio: '+str(sig2noise.mean()))
                         
@@ -1374,10 +1389,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                             sig2noise_method = 'peak2mean', 
                             width = self.parameter['sp_peak2peak_mask_width']
                         ).reshape(u.shape)
-                        u, v, mask, _ = self.postproc['validate_results'](
+                        u, v, flag, _ = self.postproc['validate_results'](
                             u, v, 
                             mask = xymask,
-                            flag = mask,
+                            flag = flag,
                             s2n = sig2noise, 
                             s2n_val = True,
                             s2n_thresh = self.parameter['sp_peak2mean_threshold'],
@@ -1385,15 +1400,14 @@ class MultiProcessing(piv_tls.Multiprocesser):
                             global_std = False,
                             z_score = False,
                             local_median = False,
-                            replace = False,
                         )
                         print('Mean peak-to-mean ratio: '+str(sig2noise.mean()))
                         
                     # validate other passes
-                    u, v, mask, _ = self.postproc['validate_results'](
+                    u, v, flag, _ = self.postproc['validate_results'](
                         u, v,
                         xymask,
-                        flag = mask,
+                        flag = flag,
                         global_thresh       = self.parameter['sp_vld_global_threshold'],
                         global_minU         = self.parameter['sp_MinU'],
                         global_maxU         = self.parameter['sp_MaxU'],
@@ -1406,11 +1420,16 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         local_median        = self.parameter['sp_local_med_validation'],
                         local_median_thresh = self.parameter['sp_local_med'],
                         local_median_kernel = self.parameter['sp_local_med_size'],
-                        replace             = self.parameter['pass_repl'],
-                        replace_method      = self.parameter['pass_repl_method'],
-                        replace_inter       = self.parameter['pass_repl_iter'],
-                        replace_kernel      = self.parameter['pass_repl_kernel'],
                     )
+                    if self.parameter['pass_repl'] == True:
+                        u, v, flag = self.postproc['replace_results'](
+                            u, v,
+                            mask = xymask,
+                            flag = flag,
+                            replace_method      = self.parameter['pass_repl_method'],
+                            replace_inter       = self.parameter['pass_repl_iter'],
+                            replace_kernel      = self.parameter['pass_repl_kernel'],
+                        )
                     print('Validated pass {} of frame: {}'.format(i,counter + self.disp_off))             
 
                     # smoothning each individual pass if 'each pass' is selected
@@ -1479,6 +1498,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['v'] = -v
         results['tp'] = np.zeros_like(x)
         results['s2n'] = sig2noise
+        results['xymask'] = xymask
         return results
                 
                 

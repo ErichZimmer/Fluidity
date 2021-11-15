@@ -274,18 +274,18 @@ class OpenPivParams():
                  'Time units of the loaded results.'],
             
             'flip_coords_spacer':
-                [1140, 'h-spacer', None,
+                [1140, 'dummy', None,
                  None,
                  None,
                  None],
 
             'flip_x':
-                [1141, 'bool', 'False', None,
+                [1141, 'dummy', False, None,
                  'flip x-component',
                  'flip x-component array when loading results.'],
 
             'flip_y':
-                [1142, 'bool', 'False', None,
+                [1142, 'dummy', False, None,
                  'flip y-component',
                  'flip y-component array when loading results.'],
             
@@ -306,18 +306,18 @@ class OpenPivParams():
                  'flip v-component array when loading results.'],
 
             'invert_spacer':
-                [1165, 'h-spacer', None,
+                [1160, 'h-spacer', None,
                  None,
                  None,
                  None],
 
             'invert_u':
-                [1160, 'bool', 'False', None,
+                [1161, 'bool', 'False', None,
                  'invert u-component',
                  'Invert (negative) u-component array when loading results.'],
 
             'invert_v':
-                [1161, 'bool', 'False', None,
+                [1162, 'bool', 'False', None,
                  'invert v-component',
                  'Invert (negative) v-component array when loading results.'],
             
@@ -799,6 +799,17 @@ class OpenPivParams():
                  'loaded in memory, so for a weaker the computer, the smaller '+
                  'the better.'],
             
+            'individual_pass_postprocessing':
+               [3603, None, None, None,
+               'PostProcessing',
+                None],
+
+           'piv_pass_postprocessing_frame':
+               [3604, 'labelframe', None,
+                None,
+                'Post-processing',
+                None],
+            
             'piv_sub_frame5':
                 [3865, 'sub_labelframe', None,
                  None,
@@ -806,12 +817,12 @@ class OpenPivParams():
                  None],
             
             'validate_last_pass':
-                [3870, 'sub_bool', False, None,
+                [3870, 'dummy', False, None,
                  'validate last pass',
                  'Validate last pass.'],
             
             'exclude_masked_regions':
-                [3890, 'sub_bool', False, None,
+                [3890, 'sub_bool', True, None,
                  'exclude masked regions',
                  'Exclude masked regions for all passes.'],
             
