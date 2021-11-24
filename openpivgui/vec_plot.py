@@ -322,7 +322,7 @@ def vector(data,
                   y[flag == 2],
                   u[flag == 2],
                   v[flag == 2],
-                  color      = parameter['invalid_color'],
+                  color      = parameter['interpolated_color'],
                   label      = 'invalid', 
                   headwidth  = parameter['vec_head_width'],
                   headlength = parameter['vec_head_len'],
@@ -809,7 +809,8 @@ def plot_colorbar(
         extendrect = True,
     )
     cb.ax.xaxis.set_ticks_position('top')
-    cb.ax.xaxis.set_label_position('top')
+    #cb.ax.xaxis.set_label_position('left')
+    #cax.set_xlabel('Test', labelpad = 0)
 '''
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='Plot vector data.')

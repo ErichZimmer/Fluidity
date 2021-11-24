@@ -320,121 +320,224 @@ class results_validate(AddIn):
            [3561, 'float', 1, None,
             'threshold',
             'The signal to noise ratio threshold value.'],
-            
-            'vld': #oops
-                [6000, None, None, None,
-                 'PostProcessing1',
-                 None],
+        
+        'vld0':
+            [6100, None, None, None,
+             'PostProcessing0',
+             None],
 
-            'vld_frame':
-                [6005, 'labelframe', None,
-                 None,
-                 'Validate compoments',
-                 None],
+        'vld0_frame':
+            [6105, 'labelframe', None,
+             None,
+             'Validate compoments',
+             None],
+        
+        'peak2peak_validation':
+            [6110, 'bool', False, 'bind',
+            'peak to peak validation',
+            'Discard vector, if the peak-to-peak value is lower'+
+            'than threshold'],
+            
+        'peak2peak_threshold':
+            [6115, 'float', 1, None,
+            'threshold',
+            'The signal to noise ratio threshold value.'],
+            
+        'vpeak2mean_spacer':
+            [6125, 'h-spacer', None,
+            None,
+            None,
+            None],
+            
+        'peak2mean_validation':
+            [6130, 'bool', False, 'bind',
+            'peak to mean validation',
+            'Discard vector, if the peak-to-peak value is lower'+
+            'than threshold.'],
+            
+        'peak2mean_threshold':
+            [6135, 'float', 1, None,
+            'threshold',
+            'The signal to noise ratio threshold value.'],
+        
+        'vpearson_corr_spacer':
+            [6140, 'dummy', None,
+            None,
+            None,
+            None],
+            
+        'pearson_validation':
+            [6145, 'dummy', False, 'bind',
+            'pearson coef validation',
+            'Validation based on Pearson correlation coefficient.'],
+            
+        'pearson_threshold':
+            [6150, 'dummy', 1, None,
+            'threshold',
+            'Values less than threshold are flagged.'],
+        
+        'av-spacer':
+            [6160, 'h-spacer', None,
+            None,
+            None,
+            None],
+        
+        'avalidate_current':
+            [6170, 'button_static_c', None, 
+             "self.start_validations(index = self.index)",
+             'Apply to current frame',
+             None],
 
-            'vld_global_thr':
-                [6010, 'bool', False, 'bind',
-                 'global threshold validation',
-                 'Validate the data based on set global ' +
-                 'thresholds.'],
-            
-            'MinU':
-                [6012, 'float', -10.0, None,
-                 'min u',
-                 'Minimum U allowable component.'],
+        'avalidate_all':
+            [6175, 'button_static_c', None, 
+             "self.start_validations()",
+             'Apply to all frames',
+             None],
 
-            'MaxU':
-                [6013, 'float', 10.0, None,
-                 'max u',
-                 'Maximum U allowable component.'],
+        'aview_validated':
+            [6180, 'button_static_c', None, 
+             "self.show(self.p['files_' + self.toggle][self.index])",
+             'Update current frame',
+             None],
+        
+        'vld':
+            [6200, None, None, None,
+             'PostProcessing1',
+             None],
 
-            'MinV':
-                [6014, 'float', -10.0, None,
-                 'min v',
-                 'Minimum V allowable component.'],
+        'vld_frame':
+            [6205, 'labelframe', None,
+             None,
+             'Validate compoments',
+             None],
 
-            'MaxV':
-                [6015, 'float', 10.0, None,
-                 'max v',
-                 'Maximum V allowable component.'],
-            
-            'set_vel_limits':
-                [6016, 'button_static_c', None, 
-                 "self.initialize_vel_interact()",
-                 'Set velocity limits',
-                 None],
-            
-            'reset_vel_limits':
-                [6017, 'button_static_c', None, 
-                 "self.reset_vel_val(type_ = 'post val')",
-                 'Reset velocity limits',
-                 None],
-            
-            'apply_glov_val_first_pass':
-                [6018, 'button_static_c', None, 
-                 "self.set_first_pass()",
-                 'Apply to first pass',
-                 None],
-            
-            'horizontal_spacer12':
-                [6025, 'h-spacer', None,
-                 None,
-                 None,
-                 None],
-            
-            'vld_global_std':
-                [6030, 'bool', False, 'bind',
-                 'standard deviation validation',
-                 'Validate the data based on a multiple of the ' +
-                 'standard deviation.'],
+        'vld_global_thr':
+            [6210, 'bool', False, 'bind',
+             'global threshold validation',
+             'Validate the data based on set global ' +
+             'thresholds.'],
 
-            'global_std_threshold':
-                [6031, 'float', 5.0, None,
-                 'std threshold',
-                 'Remove vectors, if the the sum of the squared ' +
-                 'vector components is larger than the threshold ' +
-                 'times the standard deviation of the flow field.'],
-            
-            'horizontal_spacer13':
-                [6035, 'h-spacer', None,
-                 None,
-                 None,
-                 None],
-            
-            'vld_local_med':
-                [6040, 'bool', True, 'bind',
-                 'local median validation',
-                 'Validate the data based on a local median ' +
-                 'threshold.'],
+        'MinU':
+            [6212, 'float', -10.0, None,
+             'min u',
+             'Minimum U allowable component.'],
 
-            'local_median_threshold':
-                [6041, 'float', 2, None,
-                 'local median threshold',
-                 'Discard vector, if the absolute difference with ' +
-                 'the local median is greater than the threshold. '],
+        'MaxU':
+            [6213, 'float', 10.0, None,
+             'max u',
+             'Maximum U allowable component.'],
+
+        'MinV':
+            [6214, 'float', -10.0, None,
+             'min v',
+             'Minimum V allowable component.'],
+
+        'MaxV':
+            [6215, 'float', 10.0, None,
+             'max v',
+             'Maximum V allowable component.'],
+
+        'set_vel_limits':
+            [6216, 'button_static_c', None, 
+             "self.initialize_vel_interact()",
+             'Set velocity limits',
+             None],
+
+        'reset_vel_limits':
+            [6217, 'button_static_c', None, 
+             "self.reset_vel_val(type_ = 'post val')",
+             'Reset velocity limits',
+             None],
+
+        'apply_glov_val_first_pass':
+            [6218, 'button_static_c', None, 
+             "self.set_first_pass()",
+             'Apply to first pass',
+             None],
+
+        'horizontal_spacer12':
+            [6225, 'h-spacer', None,
+             None,
+             None,
+             None],
+
+        'vld_global_std':
+            [6230, 'bool', False, 'bind',
+             'standard deviation validation',
+             'Validate the data based on a multiple of the ' +
+             'standard deviation.'],
+
+        'global_std_threshold':
+            [6231, 'float', 5.0, None,
+             'std threshold',
+             'Remove vectors, if the the sum of the squared ' +
+             'vector components is larger than the threshold ' +
+             'times the standard deviation of the flow field.'],
+
+        'horizontal_spacer13':
+            [6235, 'h-spacer', None,
+             None,
+             None,
+             None],
+
+        'vld_local_med':
+            [6240, 'bool', True, 'bind',
+             'local median validation',
+             'Validate the data based on a local median ' +
+             'threshold.'],
+
+        'local_median_threshold':
+            [6241, 'float', 2, None,
+             'local median threshold',
+             'Discard vector, if the absolute difference with ' +
+             'the local median is greater than the threshold. '],
+
+        'local_median_size':
+            [6242, 'int', 1, None,
+             'local median kernel [vec]',
+             'Local median filter kernel distance from (0,0) in vectors.'],
+        
+        'zscore-spacer':
+            [6250, 'h-spacer', None,
+             None,
+             None,
+             None],
+        
+        'zscore':
+            [6251, 'bool', False, 'bind',
+             'z-score validation',
+             'Discard vector, if the z-score of a vector is greater than '+
+             'the the user defined threshold.'],
             
-            'local_median_size':
-                [6042, 'int', 1, None,
-                 'local median kernel [vec]',
-                 'Local median filter kernel distance from (0,0) in vectors.'],
+        'zscore_threshold':
+            [6252, 'float', 4, None,
+             'threshold',
+             'Vectors with a z-score higher than this value is discarded.'],
+        
+        'apl2-spacer':
+            [6255, 'h-spacer', None,
+             None,
+             None,
+             None],
         
         'vvalidate_current':
-            [6070, 'button_static_c', None, 
+            [6270, 'button_static_c', None, 
              "self.start_validations(index = self.index)",
              'Apply to current frame',
              None],
 
         'vvalidate_all':
-            [6075, 'button_static_c', None, 
+            [6275, 'button_static_c', None, 
              "self.start_validations()",
              'Apply to all frames',
              None],
 
         'view_validated':
-            [6080, 'button_static_c', None, 
+            [6280, 'button_static_c', None, 
              "self.show(self.p['files_' + self.toggle][self.index])",
              'Update current frame',
              None],
+        
     }
 
     
@@ -489,8 +592,6 @@ class results_validate(AddIn):
             flag[0]
         except:
             flag = np.full_like(u, 0)
-        uo = u.copy()
-        vo = v.copy()
         u = np.ma.masked_array(u, mask)
         v = np.ma.masked_array(v, mask)
         
@@ -602,6 +703,15 @@ class results_validate(AddIn):
             'sp_peak2mean_validation':[
                 'sp_peak2mean_threshold',
             ],
+            'peak2peak_validation':[
+                'peak2peak_threshold',
+            ],
+            'peak2mean_validation':[
+                'peak2mean_threshold',
+            ],
+            #'pearson_validation':[
+            #    'pearson_threshold',
+            #],
             'vld_global_thr':[
                 'MinU',
                 'MaxU',
@@ -611,12 +721,15 @@ class results_validate(AddIn):
                 'reset_vel_limits',
             ],
             'vld_global_std':[
-                'global_std_threshold'
+                'global_std_threshold',
             ],
             'vld_local_med':[
                 'local_median_threshold',
-                'local_median_size'
+                'local_median_size',
             ],
+            'zscore':[
+                'zscore_threshold',
+            ]
         })
 
         gui.toggled_buttons += [

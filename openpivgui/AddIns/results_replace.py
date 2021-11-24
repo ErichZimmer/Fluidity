@@ -64,30 +64,24 @@ class results_replace(AddIn):
             'kernel size [vec]',
             'Diameter of the NaN interpolation kernel in vectors.'],
         
-        'horizontal_spacer14':
-                [6095, 'h-spacer', None,
-                 None,
-                 None,
-                 None],
-        
         'replace_stuff':
-            [6100, None, None, None,
+            [6300, None, None, None,
              'Validation',
              None],
 
          'replace_frame':
-            [6105, 'labelframe', None,
+            [6305, 'labelframe', None,
              None,
              'Replace components',
              None],
         
         'repl':
-            [6111, 'bool', True, 'bind',
+            [6311, 'bool', True, 'bind',
              'replace outliers',
              'Replace outliers.'],
 
         'repl_method':
-            [6112, 'str', 'localmean',
+            [6312, 'str', 'localmean',
              ('localmean', 'disk', 'distance'),
              'replacement method',
              'Each NaN element is replaced by a weighed average' +
@@ -97,47 +91,47 @@ class results_replace(AddIn):
              'distance.'],
 
         'repl_iter':
-            [6113, 'int', 10, None,
+            [6313, 'int', 10, None,
              'number of iterations',
              'If there are adjacent NaN elements, iterative ' +
              'replacement is needed.'],
 
         'repl_kernel':
-            [6114, 'int', 2, None,
+            [6314, 'int', 2, None,
              'kernel size [vec]',
              'Diameter of the weighting kernel in vectors.'],
         
         'val_exclude_mask_spacer':
-            [6155, 'h-spacer', None,
+            [6355, 'h-spacer', None,
              None,
              None,
              None],
 
          'validation_exlude_mask':
-            [6160, 'bool', True, None,
+            [6360, 'bool', True, None,
              'exclude masked regions',
              'Exclude masked regions from validations.'],
 
         'validation_spacer':
-            [6165, 'h-spacer', None,
+            [6365, 'h-spacer', None,
              None,
              None,
              None],
 
         'validate_current':
-            [6170, 'button_static_c', None, 
+            [6370, 'button_static_c', None, 
              "self.start_validations(index = self.index)",
              'Apply to current frame',
              None],
 
         'validate_all':
-            [6175, 'button_static_c', None, 
+            [6375, 'button_static_c', None, 
              "self.start_validations()",
              'Apply to all frames',
              None],
 
         'view_validate':
-            [6180, 'button_static_c', None, 
+            [6380, 'button_static_c', None, 
              "self.show(self.p['files_' + self.toggle][self.index])",
              'Update current frame',
              None],

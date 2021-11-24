@@ -42,7 +42,7 @@ class results_derive(AddIn):
              None],
         
         'average_results':
-             [7410, 'button_static_c', None, 
+            [7410, 'button_static_c', None, 
              "self.average_results()",
              'Average results',
              None],

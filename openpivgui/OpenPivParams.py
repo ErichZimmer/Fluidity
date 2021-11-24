@@ -523,7 +523,7 @@ class OpenPivParams():
                     'Normalized FFT Correlation',
                     'Phase Correlation',
                     #'Minimum Quadratic Differences',
-                    'FFT-based Convolution',
+                    #'Direct Convolution',
                     ),
                  'algorithm',
                  'Algorithm used for the correlation.'#+
@@ -728,8 +728,8 @@ class OpenPivParams():
                     'hamming',
                   ),
                  'window weighting',
-                 'Window weighting function applied to the interrogation windows and '+
-                 'correlation matrix (multiplied by autocorrelation of weighting function).'],
+                 'Window weighting function applied to the interrogation windows.'],# and '+
+                 #'correlation matrix (multiplied by autocorrelation of weighting function).'],
             
             'window_weighting_sigma':
                 [3195, 'sub_float', 8.0, None,
@@ -747,27 +747,22 @@ class OpenPivParams():
                  'interrogation window [px]',
                  'Interrogation window size in pixels.'],
             
-            'signal2noise_sub_h-frame':
+            'corr_stats_sub_h-frame':
                 [3200, 'sub_labelframe', None,
                  None,
-                 'signal to noise ratio',
+                 'correlation statistics',
                  None],
             
-            'do_s2n':
+            'do_corr_stats':
                 [3205, 'sub_bool', True, 'bind',
-                 'calculate signal to noise ratio',
-                 'Calculate signal to noise ratio. (slow)'],
-
-            's2n_method':
-                [3210, 'sub', 'peak2mean', ('peak2mean','peak2peak'),
-                 'method:',
-                 'Method used to calculate signal to noise ratio.'],
+                 'calculate correlation statistics',
+                 'Calculate peak-to-peak ratio, peak-to-mean ratio, and '+
+                 "pearson's correlation coefficient."],
             
             's2n_mask':
                 [3215, 'sub_int', 2, None,
                  'mask width [px from origin]',
-                 'Used to find the second peak when doing peak to peak '
-                 'signal to noise calculation.'],
+                 'Used to find the second peak when doing peak-to-peak calculation.'],
             
             'multicore_frame':
                 [3255, 'sub_labelframe', None,
@@ -1097,13 +1092,18 @@ class OpenPivParams():
             
             'valid_color': # hardcoded button
                 [8045, 'dummy', '#00ff00', None,
-                 None,
+                 'valid color',
                  'Choose the color of the valid vectors'],
             
             'invalid_color':
                 [8050, 'dummy', 'red', None,
-                 None,
+                 'invalid color',
                  'Choose the color of the invalid vectors'],
+            
+            'interpolated_color':
+                [8051, 'dummy', 'red', None,
+                 'interpolated color',
+                 'Choose the color of the interpolated vectors'],
             
             'vector_appearance_frame3':
                 [8055, 'sub_h-spacer', None,
@@ -1312,10 +1312,20 @@ class OpenPivParams():
                  '% masked vectors',
                  'Percent of masked vectors.'],
             
-            'statistics_s2n_mean':
+            'statistics_peak2mean':
                 [8447, 'sub_float', 0, None, 
-                 'sig2noise ratio mean',
+                 'corr. peak2mean ratio',
                  'Mean signal to noise ratio value.'],
+            
+            'statistics_peak2peak':
+                [8448, 'sub_float', 0, None, 
+                 'corr. peak2peak ratio',
+                 'Mean signal to noise ratio value.'],
+            
+            'statistics_pcorr':
+                [8449, 'sub_float', 0, None, 
+                 'mean correlation coef',
+                 'Mean correlation coefficient.'],
             
             'view_statistics_plot':
                 [8455, 'button_static_c', None, 
@@ -1928,6 +1938,163 @@ class OpenPivParams():
                  "self.movie_to_images()",
                  'Select movie to process',
                  None],
+            
+            # Convert images to movie
+            'sig':
+                [11600, None, None, None,
+                 'SIG',
+                 None],
+            
+            'sig_frame':
+                [11605, 'labelframe', None, None,
+                 ' Synthetic image generator',
+                 None],
+            
+            'sig_label':
+                [11610, 'label', None, None,
+                'All images are saved as uint8',
+                None],
+            
+            'sig_image_settings_subframe':
+                [11615, 'sub_labelframe', None, 
+                 None,
+                 'Image settings',
+                 None],
+            
+            'sig_size_x':
+                [11620, 'sub_int', 512, None,
+                 'image width [px]',
+                 'Image width in pixels.'],
+            
+            'sig_size_y':
+                [11625, 'sub_int', 512, None,
+                 'image height [px]',
+                 'Image height in pixels.'],
+            
+            'sig_fname':
+                [11630, 'sub', 'out_{}', None,
+                 'filename',
+                 'Image filename.'],
+            
+            'sig_part_settings_subframe':
+                [11640, 'sub_labelframe', None, 
+                 None,
+                 'Particle settings',
+                 None],
+            
+            'sig_sheet_thick':
+                [11641, 'sub_float', 0.25, None,
+                 'light sheet thickness [0-1]',
+                 'Depth of the simulated light sheet.'],
+            
+            'sig_part_Z':
+                [11642, 'sub_int', 20, None,
+                 'random z position [%]',
+                 'Random position of particles in light sheet.'],
+            
+            'sig_part_num':
+                [11643, 'sub_int', 8000, None,
+                 'number of particles',
+                 'Number of particles in image.'],
+            
+            'sig_part_dia':
+                [11644, 'sub_float', 1.75, None,
+                 'particle diameter [px]',
+                 'Diameter of the generated particles in pixels.'],
+            
+            'sig_part_dia_std':
+                [11645, 'sub_float', 0.25, None,
+                 'particle diameter std [px]',
+                 'How much the diameter of the particle can deviate from in pixels.'],
+            
+            'sig_noise':
+                [11646, 'sub_float', 0.001, None,
+                 'noise',
+                 'Strangth of gaussian white noise.'],
+            
+            'sig_flow':
+                [11646, 'str', 'linear', (
+                    'linear',
+                    #'parabolic',
+                    'rankine vortex', 
+                    #'lamb-oseen vortex', 
+                 ),
+                 'flow type',
+                 'Type of flow to simulate.'],
+            
+            'sig_linear':
+                [11650, 'sub_labelframe', None, 
+                 None,
+                 'Linear/parabolic flow simulation',
+                 None],
+            
+            'sig_linpar_x_disp':
+                [11651, 'sub', '5', None,
+                 'max x displacement [px]',
+                 'Maximum x (u) displacement(s).'],
+            
+            'sig_linpar_y_disp':
+                [11652, 'sub', '5', None,
+                 'max y displacement [px]',
+                 'Maximum y (v) displacement(s).'],
+            
+            'sig_vortex':
+                [11660, 'sub_labelframe', None, 
+                 None,
+                 'Vortex flow simulation',
+                 None],
+            
+            'sig_vortex_x1':
+                [11661, 'sub_int', 256, None,
+                 'vortex center (x-axis) [px]',
+                 'Where to place the center of the first vortex in the x-axis.'],
+            
+            'sig_vortex_y1':
+                [11662, 'sub_int', 256, None,
+                 'vortex center (y-axis) [px]',
+                 'Where to place the center of the first vortex in the y-axis.'],
+            
+            'sig_second_vortex':
+                [11663, 'sub_bool', False, 'bind',
+                 'generate second vortex',
+                 'Generate a second vortex in the flow field.'],
+            
+            'sig_vortex_x2':
+                [11664, 'sub_int', 256, None,
+                 'vortex center (x-axis) [px]',
+                 'Where to place the center of the second vortex in the x-axis.'],
+            
+            'sig_vortex_y2':
+                [11665, 'sub_int', 256, None,
+                 'vortex center (y-axis) [px]',
+                 'Where to place the center of the second vortex in the y-axis.'],
+            
+            'sig_vortex_core':
+                [11666, 'sub_int', 5, None,
+                 'core radius [px]',
+                 'Vortex core radius.'],
+            
+            'sig_vortex_max_disp':
+                [11667, 'sub', '5', None,
+                 'max displacement [px]',
+                 'Maximum vortex displacement(s).'],
+            
+            'sig_preview':
+                [11685, 'button_static_c', None, 
+                 "print('Not implemented')",
+                 'Preview synthetic image',
+                 None],
+            
+            'sig_generate_images':
+                [11690, 'button_static_c', None, 
+                 "self.generate_synthetic_images()",
+                 'Generate images',
+                 None],
+            
+            'sig_gen_img_amount':
+                [11695, 'int', 1, None,
+                 'number of image pair(s)',
+                 'Number of image pairs to create.'],
         }
 
         # splitting the dictionary for more convenient access

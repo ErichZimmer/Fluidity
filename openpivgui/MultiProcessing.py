@@ -473,15 +473,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 limit_peak_search = True
                 peak_distance = self.parameter['limit_peak_search_distance_last']
 
-            if self.parameter['do_s2n']:
-                if passes == 1:
-                    do_s2n = True
-                else:
-                    do_s2n = False
-            else:
-                do_s2n = False
-
-            x, y, u, v, s2n, corr = pivware.firstpass(
+            x, y, u, v, corr = pivware.firstpass(
                 frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                 window_size                = corr_window,
                 overlap                    = overlap,
@@ -495,9 +487,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
                 limit_peak_search          = limit_peak_search,
                 limit_peak_search_distance = peak_distance,
-                do_sig2noise               = do_s2n,
-                sig2noise_method           = self.parameter['s2n_method'],
-                sig2noise_mask             = self.parameter['s2n_mask'],
                 rfft2  = self.rfft_plans['pass_1'],
                 irfft2 = self.irfft_plans['pass_1'],
             )
@@ -505,10 +494,12 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 # applying mask(s)
                 if len(mask_coords) > 0:
                     xymask = coords_to_xymask(x, y, mask_coords).reshape(x.shape)
-                print('Created mask')
+                else:
+                    xymask = np.zeros_like(x)
             else:
                 xymask = np.zeros_like(x)
-                
+            print('Created mask')
+            
             # validating first pass, signal to noise calc.
             if passes != 1 or self.parameter['validate_last_pass'] == True:
                 startn = time.time()
@@ -640,14 +631,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     limit_peak_search = True
                     peak_distance = self.parameter['limit_peak_search_distance_last']
 
-                if self.parameter['do_s2n']:
-                    if passes == i:
-                        do_s2n = True
-                    else:
-                        do_s2n = False
-                else:
-                    do_s2n = False
-                x, y, u, v, s2n, corr = pivware.multipass(
+                x, y, u, v, corr = pivware.multipass(
                     frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                     corr_window,
                     overlap,
@@ -670,22 +654,22 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
                     limit_peak_search          = limit_peak_search,
                     limit_peak_search_distance = peak_distance,
-                    do_sig2noise               = do_s2n,
-                    sig2noise_method           = self.parameter['s2n_method'],
-                    sig2noise_mask             = self.parameter['s2n_mask'],
                     rfft2 = self.rfft_plans[f'pass_{1}'],
                     irfft2 = self.irfft_plans[f'pass_{1}'],
                 )
-                if i != passes or self.parameter['validate_last_pass'] == True:
+                if i != passes:
                     startn = time.time()
                     if self.parameter['exclude_masked_regions'] == True:
                         # applying mask(s)
                         if len(mask_coords) > 0:
                             xymask = coords_to_xymask(x, y, mask_coords)
                             xymask.reshape(x.shape)
-                            print('Created mask')
+                        else:
+                            xymask = np.zeros_like(x)
                     else:
                         xymask = np.zeros_like(x)
+                    print('Created mask') 
+                    
                     flag = np.full_like(x, 0)
                     if self.parameter['sp_peak2peak_validation'] == True:
                         sig2noise = piv_prc.vectorized_sig2noise_ratio(
@@ -769,12 +753,11 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 print(f"window size (y,x): {corr_window[0]}x{corr_window[1]} pixels")
                 print(f'overlap (y,x): {overlap[0]}x{overlap[1]} pixels', '\n')  
                 iterations -= 1
-        if self.parameter['validate_last_pass'] != True:
-            flag = np.full_like(x, 0)
+        flag = np.zeros_like(x)
         flag[u == np.nan] = 1
         flag[v == np.nan] = 1
                     
-        if self.parameter['algorithm'].lower() == 'fft-based convolution':
+        if self.parameter['algorithm'].lower() == 'direct convolution':
             u *= -1
             v *= -1
             
@@ -794,8 +777,31 @@ class MultiProcessing(piv_tls.Multiprocesser):
         if len(mask_coords) > 0:
             xymask = coords_to_xymask(x, y, mask_coords)
             xymask.reshape(x.shape)
-            print('Created mask')
-                        
+        else:
+            xymask = np.zeros_like(x)
+        print('Created mask')
+        
+        startn = time.time()
+        if self.parameter['do_corr_stats'] == True:
+            peak2peak = piv_prc.vectorized_sig2noise_ratio(
+                corr, 
+                sig2noise_method='peak2peak', 
+                width = self.parameter['sp_peak2peak_mask_width']
+            ).reshape(u.shape)
+
+            peak2mean = piv_prc.vectorized_sig2noise_ratio(
+                corr, 
+                sig2noise_method = 'peak2mean', 
+                width = self.parameter['sp_peak2peak_mask_width']
+            ).reshape(u.shape)
+            corrMax = corr.max(axis=(-2,-1))#pivware.pearson_corr(frame_a, frame_b, corr_window, overlap)
+            
+        else:
+            peak2peak = np.zeros_like(x)
+            peak2mean = peak2peak
+            corrMax = peak2peak
+        print(f'Generated correlation statistics ({_round(time.time() - startn, 3)} second(s))')
+        
         results = {}
         results['processed'] = True
         results['roi_present'] = roi_present
@@ -807,8 +813,11 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['u'] = u
         results['v'] = -v 
         results['tp'] = flag
-        results['s2n'] = s2n
         results['xymask'] = xymask
+        results['peak2peak'] = peak2peak
+        results['peak2mean'] = peak2mean
+        results['corrMax'] = corrMax
+        
             
         # additional information of evaluation
         time_per_vec = _round((((end - start) * 1000) / u.size), 3)
@@ -877,7 +886,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
             limit_peak_search = True
             peak_distance = self.parameter['limit_peak_search_distance_last']
 
-        do_s2n = False
         start = time.time()
         for counter in range(len(self.files_a)):
             if self.parameter['analysis'] != True:
@@ -995,12 +1003,9 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
                 limit_peak_search          = limit_peak_search,
                 limit_peak_search_distance = peak_distance,
-                do_sig2noise               = do_s2n,
-                sig2noise_method           = self.parameter['s2n_method'],
-                sig2noise_mask             = self.parameter['s2n_mask'],
                 rfft2                      = self.rfft_plans[f'pass_{1}'],
                 irfft2                     = self.irfft_plans[f'pass_{1}'],
-            )[5]
+            )[4]
             
             if counter == 0:
                 corr_avg = corr
@@ -1293,12 +1298,9 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
                         limit_peak_search          = limit_peak_search,
                         limit_peak_search_distance = peak_distance,
-                        do_sig2noise               = do_s2n,
-                        sig2noise_method           = self.parameter['s2n_method'],
-                        sig2noise_mask             = self.parameter['s2n_mask'],
                         rfft2                      = self.rfft_plans[f'pass_{1}'],
                         irfft2                     = self.irfft_plans[f'pass_{1}'],
-                    )[5]
+                    )[4]
                     if counter == 0:
                         corr_avg = corr
                     else:
@@ -1464,17 +1466,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
         xymask[xymask > 0.5] = 1
         xymask = xymask.reshape(x.shape)
         print('Generated mask')
-             
-            
-        if self.parameter['do_s2n']:
-            sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                corr, 
-                sig2noise_method=self.parameter['s2n_method'],
-                width=self.parameter['s2n_mask']
-            )
-        else:
-            sig2noise = np.zeros(n_rows * n_cols)
-        sig2noise = sig2noise.reshape(n_rows, n_cols)
         
         try:
             int(roi_xmin) 
@@ -1497,8 +1488,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['u'] = u
         results['v'] = -v
         results['tp'] = np.zeros_like(x)
-        results['s2n'] = sig2noise
         results['xymask'] = xymask
+        results['peak2peak'] = np.zeros_like(x)
+        results['peak2mean'] = np.zeros_like(x)
+        results['corrMax'] = np.zeros_like(x)
         return results
                 
                 
@@ -1508,7 +1501,8 @@ import scipy.ndimage as scn
 from scipy import fft
 from scipy.signal import convolve2d, get_window
 from scipy.interpolate import RectBivariateSpline
-    
+from scipy.stats import pearsonr
+
 class pivware():    
     def firstpass(
         frame_a, frame_b,
@@ -1576,7 +1570,7 @@ class pivware():
                 rfft2 = rfft2,
                 irfft2 = irfft2,
             )
-        elif algorithm.lower() == 'fft-based convolution':
+        elif algorithm.lower() == 'direct convolution':
             corr = pivware.convolution(
                 aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
                 bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
@@ -1609,16 +1603,6 @@ class pivware():
         corr = corr.astype('float32')
         print(f'Correlated images ({_round(time.time() - start, 3)} second(s))')  
         print(f'Memory allocated towards correlation matrix: {corr.nbytes / 1e6} MB')
-        
-        if do_sig2noise:
-            sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                corr, 
-                sig2noise_method=sig2noise_method, 
-                width=sig2noise_mask
-            )
-        else:
-            sig2noise = np.zeros(n_rows * n_cols)
-        sig2noise = sig2noise.reshape(n_rows, n_cols)
         
         if corr[0, :, :].shape[0] >= 8:
             if disable_autocorrelation:
@@ -1653,7 +1637,7 @@ class pivware():
         u = np.ma.masked_array(u, np.ma.nomask)
         v = np.ma.masked_array(v, np.ma.nomask) 
         
-        return x, y, u, v, sig2noise, corr
+        return x, y, u, v, corr
     
     
     
@@ -1793,7 +1777,7 @@ class pivware():
                 rfft2 = rfft2,
                 irfft2 = irfft2,
             )
-        elif algorithm.lower() == 'fft-based convolution':
+        elif algorithm.lower() == 'direct convolution':
             corr = pivware.convolution(
                 aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
                 bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
@@ -1834,16 +1818,6 @@ class pivware():
         corr = corr.astype('float32')
         print(f'Correlated images ({_round(time.time() - start, 3)} second(s))') 
         print(f'Memory allocated towards correlation matrix: {corr.nbytes / 1e6} MB')
-        
-        if do_sig2noise:
-            sig2noise = piv_prc.vectorized_sig2noise_ratio(
-                corr, 
-                sig2noise_method=sig2noise_method, 
-                width=sig2noise_mask
-            )
-        else:
-            sig2noise = np.zeros(n_rows * n_cols)
-        sig2noise = sig2noise.reshape(n_rows, n_cols)
         
         if corr[0, :, :].shape[0] >= 8:
             if disable_autocorrelation:
@@ -1891,7 +1865,7 @@ class pivware():
         u = np.ma.masked_array(u, np.ma.nomask)
         v = np.ma.masked_array(v, np.ma.nomask) 
             
-        return x, y, u, v, sig2noise, corr
+        return x, y, u, v, corr
     
     
     def fft_norm_correlate_images(image_a, image_b,
@@ -2013,10 +1987,7 @@ class pivware():
     def convolution(aa, bb):
         corrMat = []
         for i in range(aa.shape[0]):
-            corr = piv_prc.fft_correlate_windows(
-                aa[i,:,:], 
-                bb[i,:,:],
-            ).astype('float16')
+            corr = convolve2d(aa[i,:,:], bb[i,::-1, ::-1], "full").astype('float32')
             corrMat.append(corr)
         return np.array(corrMat)
     
@@ -2045,3 +2016,20 @@ class pivware():
         else:
             print('Ignoring peak search area limit due to search area size being less than 4 pixels in either x or y direction')
         return corr    
+    
+    
+    def pearson_corr(frame_a, frame_b, window_size, overlap):
+        aa = piv_prc.sliding_window_array(
+            frame_a, 
+            window_size, 
+            overlap
+        )
+        bb = piv_prc.sliding_window_array(
+            frame_b, 
+            window_size,
+            overlap
+        )
+        coef = np.zeros((aa.shape[0]))
+        for i in range(aa.shape[0]):
+            coef[i] = pearsonr(aa[i,:,:], bb[i,:,:])
+        return coef

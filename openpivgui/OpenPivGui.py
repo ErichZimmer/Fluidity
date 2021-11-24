@@ -25,6 +25,7 @@ from tifffile import imsave as _imsave
 from imageio import get_reader, get_writer, imread
 from pkg_resources import get_distribution
 from scipy.signal import get_window
+from scipy.special import erf
 from ast import literal_eval
 import matplotlib.pyplot as plt
 import matplotlib.path as Path
@@ -52,7 +53,7 @@ import sys
 import re
 import os
 
-__version__ = '0.0.6'
+__version__ = '0.0.7'
 
 __licence__ = '''
 This program is free software: you can redistribute it and/or modify
@@ -344,7 +345,9 @@ class OpenPivGui(tk.Tk):
                 if 'v' in frame: del frame['v']
                 if 'tp' in frame: del frame['tp']
                 if 'xymask' in frame: del frame['xymask']
-                if 's2n' in frame: del frame['s2n']
+                if 'peak2peak' in frame: del frame['peak2peak']
+                if 'peak2mean' in frame: del frame['peak2mean']
+                if 'corrMax' in frame: del frame['corrMax']
                 if 'corr' in frame: del frame['corr']
 
                 frame.create_dataset('x', data = results['x'])
@@ -353,7 +356,9 @@ class OpenPivGui(tk.Tk):
                 frame.create_dataset('v', data = results['v'])
                 frame.create_dataset('tp', data = results['tp'])
                 frame.create_dataset('xymask', data = results['xymask'])
-                frame.create_dataset('s2n', data = results['s2n'])
+                frame.create_dataset('peak2peak', data = results['peak2peak'])
+                frame.create_dataset('peak2mean', data = results['peak2mean'])
+                frame.create_dataset('corrMax', data = results['corrMax'])
                 frame.create_dataset('corr', data = results['corr'])
 
                 if 'u_vld' in frame:
@@ -431,7 +436,10 @@ class OpenPivGui(tk.Tk):
                         if 'u' in frame: del frame['u']
                         if 'v' in frame: del frame['v']
                         if 'tp' in frame: del frame['tp']
-                        if 's2n' in frame: del frame['s2n']
+                        if 'xymask' in frame: del frame['xymask']
+                        if 'peak2peak' in frame: del frame['peak2peak']
+                        if 'peak2mean' in frame: del frame['peak2mean']
+                        if 'corrMax' in frame: del frame['corrMax']
                         if 'corr' in frame: del frame['corr']
 
                         frame.create_dataset('x', data = results.item().get('x'))
@@ -439,8 +447,10 @@ class OpenPivGui(tk.Tk):
                         frame.create_dataset('u', data = results.item().get('u'))
                         frame.create_dataset('v', data = results.item().get('v'))
                         frame.create_dataset('tp', data = results.item().get('tp'))
-                        frame.create_dataset('xymask', data = results['xymask'])
-                        frame.create_dataset('s2n', data = results.item().get('s2n'))
+                        frame.create_dataset('xymask', data = results.item().get('xymask'))
+                        frame.create_dataset('peak2peak', data = results.item().get('peak2peak'))
+                        frame.create_dataset('peak2mean', data = results.item().get('peak2mean'))
+                        frame.create_dataset('corrMax', data = results.item().get('corrMax'))
 
                         if 'u_vld' in frame:
                             del frame['u_vld']
@@ -511,7 +521,9 @@ class OpenPivGui(tk.Tk):
                     if 'v' in frame: del frame['v']
                     if 'tp' in frame: del frame['tp']
                     if 'xymask' in frame: del frame['xymask']
-                    if 's2n' in frame: del frame['s2n']
+                    if 'peak2peak' in frame: del frame['peak2peak']
+                    if 'peak2mean' in frame: del frame['peak2mean']
+                    if 'corrMax' in frame: del frame['corrMax']
                     if 'corr' in frame: del frame['corr']
 
                     frame.create_dataset('x', data = results['x'])
@@ -520,7 +532,10 @@ class OpenPivGui(tk.Tk):
                     frame.create_dataset('v', data = results['v'])
                     frame.create_dataset('tp', data = results['tp'])
                     frame.create_dataset('xymask', data = results['xymask'])
-                    frame.create_dataset('s2n', data = results['s2n'])
+                    frame.create_dataset('peak2peak', data = results['peak2peak'])
+                    frame.create_dataset('peak2mean', data = results['peak2mean'])
+                    frame.create_dataset('corrMax', data = results['corrMax'])
+                    #frame.create_dataset('corr', data = results['corr'])
 
                     if 'u_vld' in frame:
                         del frame['u_vld']
@@ -623,15 +638,37 @@ class OpenPivGui(tk.Tk):
                 y = np.array(frame['y'])
                 u = np.array(frame['u'])
                 v = np.array(frame['v'])
+                peak2peak = np.array(frame['peak2peak'])
+                peak2mean = np.array(frame['peak2mean'])
                 
                 if len(mask_coords) > 0 and self.p['validation_exlude_mask'] == True:
                     mask = np.array(frame['xymask'])
                 else: 
                     mask = np.ma.nomask               
- 
-                flag = np.array(frame['tp']) # maybe rename this to flag?                
+                flag = np.array(frame['tp']) # maybe rename this to flag?     
+                un = u.copy()
+                vn = v.copy()
+                
+                if self.p['peak2peak_validation'] == True and np.nanmean(peak2peak) > 0.25:
+                    un, vn, flag, isSame = self.postprocessing_methods['validate_results'](
+                        un, vn,
+                        mask, flag, 
+                        s2n = peak2peak, 
+                        s2n_val = True,
+                        s2n_thresh = self.p['peak2peak_threshold'], # no s2n validation
+                    )
+                
+                if self.p['peak2mean_validation'] == True and np.nanmean(peak2mean) > 0.25:
+                    un, vn, flag, isSame = self.postprocessing_methods['validate_results'](
+                        un, vn,
+                        mask, flag, 
+                        s2n = peak2mean, 
+                        s2n_val = True,
+                        s2n_thresh = self.p['peak2mean_threshold'], # no s2n validation
+                    )
+                            
                 _, _, flag, isSame = self.postprocessing_methods['validate_results'](
-                    u.copy(), v.copy(),
+                    un, vn,
                     mask, flag, 
                     None, # no s2n validation
                     global_thresh       = self.p['vld_global_thr'],
@@ -641,8 +678,8 @@ class OpenPivGui(tk.Tk):
                     global_maxV         = self.p['MaxV'],
                     global_std          = self.p['vld_global_std'],
                     global_std_thresh   = self.p['global_std_threshold'],
-                    #z_score             = self.p['zscore'],
-                    #z_score_thresh      = self.p['zscore_threshold'],
+                    z_score             = self.p['zscore'],
+                    z_score_thresh      = self.p['zscore_threshold'],
                     local_median        = self.p['vld_local_med'],
                     local_median_thresh = self.p['local_median_threshold'],
                     local_median_kernel = self.p['local_median_size'],
@@ -890,8 +927,10 @@ class OpenPivGui(tk.Tk):
             frame.create_dataset('u', data = u)
             frame.create_dataset('v', data = v)
             frame.create_dataset('tp', data = flag)
-            frame.create_dataset('s2n', data = s2n)   
             frame.create_dataset('xymask', data = np.zeros_like(x))
+            frame.create_dataset('peak2peak', data = np.zeros_like(x))
+            frame.create_dataset('peak2mean', data = np.zeros_like(x))
+            frame.create_dataset('corrMax', data = np.zeros_like(x))
         #except Exception as e:
         #    print("Failed to average results.\nReason: " + str(e))
         #self.enable_widgets()
@@ -964,11 +1003,9 @@ class OpenPivGui(tk.Tk):
             elif self.p.index[key] == 3015:
                 self.__init_windowing_hint()
             elif self.p.index[key] == 8045:
-                self.__init_vec_colorpicker(key)
-            elif self.p.index[key] == 8070:
-                self.__init_mask_vec_colorpicker(key)   
-            #elif self.p.index[key] == 8045:
-            #    self.__init_exclusions_preferences()
+                self.__init_colorpickers(True)
+            elif self.p.index[key] == 8630:
+                self.__init_colorpickers(False)  
         self.selection(0)
                 
 
@@ -1199,9 +1236,9 @@ class OpenPivGui(tk.Tk):
                 defaultextension = '.json',
                 filetypes = [('json', '*.json'), ]
             )))
-        submenu.add_command(label='main figure', command = lambda: self.selection(27))
-        submenu.add_command(label='pre-processed images', command = lambda: self.selection(29))
-        submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(28))
+        submenu.add_command(label='main figure', command = lambda: self.selection(28))
+        submenu.add_command(label='pre-processed images', command = lambda: self.selection(30))
+        submenu.add_command(label='results as ASCI-II', command = lambda: self.selection(29))
         #submenu.add_command(label='TecPlot')
         #submenu.add_command(label='ParaView')
         options.add_cascade(label='Export', menu=submenu)
@@ -1212,9 +1249,9 @@ class OpenPivGui(tk.Tk):
         options.add_cascade(label='Reset', menu=submenu)
         options.add_separator()
         submenu = tk.Menu(options, tearoff=0)
-        submenu.add_command(label='images to movie', command = lambda: self.selection(30))
-        submenu.add_command(label='movie to images', command = lambda: self.selection(31))
-        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(32))
+        submenu.add_command(label='images to movie', command = lambda: self.selection(31))
+        submenu.add_command(label='movie to images', command = lambda: self.selection(32))
+        submenu.add_command(label='units (Not implemented)', command = lambda: self.selection(33))
         options.add_cascade(label='Convert', menu=submenu)
         options.add_separator()
         options.add_command(label='Exit', command=self.destroy)
@@ -1262,38 +1299,40 @@ class OpenPivGui(tk.Tk):
         postproc = ttk.Menubutton(f, text='Post-processing')
         options = tk.Menu(postproc, tearoff=0)
         postproc.config(menu=options)
-        options.add_command(label='Validate components (vector based)',
+        options.add_command(label='Validate components (correlation based)',
                              command=lambda: self.selection(15))
-        options.add_command(label='Replace components',
+        options.add_command(label='Validate components (vector based)',
                              command=lambda: self.selection(16))
-        options.add_command(label='Modify components',
+        options.add_command(label='Replace components',
                              command=lambda: self.selection(17))
-        options.add_command(label='Derive components',
+        options.add_command(label='Modify components',
                              command=lambda: self.selection(18))
+        options.add_command(label='Derive components',
+                             command=lambda: self.selection(19))
         postproc.pack(side='left', fill='x')
 
         plot = ttk.Menubutton(f, text='Data exploration')
         options = tk.Menu(plot, tearoff=0)
         plot.config(menu=options)
         options.add_command(
-            label='Vectors', command=lambda: self.selection(19))
+            label='Vectors', command=lambda: self.selection(20))
         options.add_command(
-            label='Contours', command=lambda: self.selection(20))
+            label='Contours', command=lambda: self.selection(21))
         options.add_command(
-            label='Streamlines', command=lambda: self.selection(21))
+            label='Streamlines', command=lambda: self.selection(22))
         options.add_command(
-            label='Statistics', command=lambda: self.selection(22))
+            label='Statistics', command=lambda: self.selection(23))
         options.add_command(
-            label='Extractions', command=lambda: self.selection(23))
+            label='Extractions', command=lambda: self.selection(24))
         options.add_command(
-            label='Preferences', command=lambda: self.selection(24))
+            label='Preferences', command=lambda: self.selection(25))
         plot.pack(side='left', fill='x')
         
         u_func = ttk.Menubutton(f, text='User function')
         options = tk.Menu(u_func, tearoff=0)
         u_func.config(menu=options)
         options.add_command(label='Show user function',
-                             command=lambda: self.selection(26))
+                             command=lambda: self.selection(27))
         options.add_command(label='Execute user function',
                              command=self.text_function)
         u_func.pack(side='left', fill='x')
@@ -1302,7 +1341,7 @@ class OpenPivGui(tk.Tk):
         options = tk.Menu(lab_func, tearoff=0)
         lab_func.config(menu=options)
         options.add_command(label='Show lab book',
-                             command=lambda: self.selection(25))
+                             command=lambda: self.selection(26))
         lab_func.pack(side='left', fill='x')
 
         usage_func = ttk.Menubutton(f, text='Usage')
@@ -1337,16 +1376,25 @@ class OpenPivGui(tk.Tk):
             invalid = typevector.astype('bool') # possibly subtract the mask??
             invalid = np.count_nonzero(invalid)
             invalid_percent = _round(((invalid / np.size(results[1])) * 100), 4)
-            try:
-                s2n_mean = _round(np.mean(results[6]), 3)
-            except: s2n_mean = 0.0
+            
+            try: peak2peak = _round(np.mean(results[-2]), 3)
+            except: peak2peak = 0.0
+                
+            try: peak2mean = _round(np.mean(results[6]), 3)
+            except: peak2mean = 0.0
+                
+            try: corrMax = _round(np.mean(results[-1]), 3)
+            except: corrMax = 0.0
+                
             self.tkvars['statistics_vec_amount'].set(results[1].size)
             self.tkvars['statistics_vec_time'].set(_round(results[0], 5))
             self.tkvars['statistics_vec_time2'].set(_round(((results[0] * 1000) / np.size(results[1])), 3))
             self.tkvars['statistics_vec_invalid'].set(invalid_percent)
             self.tkvars['statistics_vec_valid'].set(100 - invalid_percent)
             self.tkvars['statistics_vec_masked'].set(mask_percent)
-            self.tkvars['statistics_s2n_mean'].set(float(str(s2n_mean)[0:5]))
+            self.tkvars['statistics_peak2mean'].set(float(str(peak2mean)[0:5])) # avoids wierd bug
+            self.tkvars['statistics_peak2peak'].set(float(str(peak2peak)[0:5]))
+            self.tkvars['statistics_pcorr'].set(float(str(corrMax)[0:5]))
         except Exception as e:
             print('Could not calculate statistics.')
             print('Reason: '+str(e))
@@ -2033,11 +2081,21 @@ class OpenPivGui(tk.Tk):
         self.ttk_widgets[key]['command'] = lambda: self.set_windowing(0)
 
         
-    def __init_exclusions_preferences(self):
+    def __init_colorpickers(self, vecs = True):
         whitespace = '                   '
-        keys = ['roi_border', 'mask_fill'] 
-        command = [self.roi_border_colorpicker,
-                   self.mask_fill_colorpicker]
+        if vecs == True:
+            keys = ['valid_color', 'invalid_color', 'interpolated_color']
+            command = [
+                self.valid_colorpicker,
+                self.invalid_colorpicker,
+                self.interpolated_colorpicker,
+            ]
+        else:
+            keys = ['roi_border', 'mask_fill']
+            command = [
+                self.roi_border_colorpicker,
+                self.mask_fill_colorpicker
+            ]
         i = 0
         for key in keys:
             f = ttk.Frame(self.sub_lf)
@@ -2055,7 +2113,7 @@ class OpenPivGui(tk.Tk):
             i+=1
         
         
-    def __init_vec_colorpicker(self, key):
+    def __init_vec_colorpickers(self, key):
         whitespace = '                   '
         f = ttk.Frame(self.sub_lf)
         l = ttk.Label(f, text='valid vector color')
@@ -2165,19 +2223,24 @@ class OpenPivGui(tk.Tk):
             self.p['mask_vec'] = color
             self.mask_vec_color.config(bg=self.p['mask_vec'])
         
-        
+    def interpolated_colorpicker(self):
+        color = colorchooser.askcolor()[1]
+        if color != None:
+            self.p['interpolated_color'] = color
+            self.ttk_widgets['interpolated_color'].config(bg=self.p['interpolated_color'])
+            
     def invalid_colorpicker(self):
         color = colorchooser.askcolor()[1]
         if color != None:
             self.p['invalid_color'] = color
-            self.invalid_color.config(bg=self.p['invalid_color'])
+            self.ttk_widgets['invalid_color'].config(bg=self.p['invalid_color'])
 
         
     def valid_colorpicker(self):
         color = colorchooser.askcolor()[1]
         if color != None:
             self.p['valid_color'] = color
-            self.valid_color.config(bg=self.p['valid_color'])
+            self.ttk_widgets['valid_color'].config(bg=self.p['valid_color'])
     
     
     
@@ -2452,7 +2515,9 @@ class OpenPivGui(tk.Tk):
                     frame.create_dataset('u', data = u)
                     frame.create_dataset('v', data = v)
                     frame.create_dataset('tp', data = flag)
-                    frame.create_dataset('s2n', data = s2n)
+                    frame.create_dataset('peak2peak', data = np.zeros_like(x))
+                    frame.create_dataset('peak2mean', data = np.zeros_like(x))
+                    frame.create_dataset('corrMax', data = np.zeros_like(x))
                     self.p['fnames'].append(
                         'Frame '+str(str(frame_num).zfill(
                             math.ceil(
@@ -4623,6 +4688,283 @@ class OpenPivGui(tk.Tk):
         print('Initialized interactive area selection')
     
     
+    def gen_linear_flow_field(
+        self, size_x, size_y, velx = 5, vely = 5, 
+    ):
+        flow_u = np.ones((size_x, size_y))
+        flow_v = flow_u.copy()
+        flow_u *= velx
+        flow_v *= vely
+        return flow_u, flow_v
+    
+        
+    def gen_rankine_flow_field( # Copyright (c) PIVlab, please see PIVlab for licenses
+        self, size_x, size_y,
+        centers = [(256,256)], radius = 5, maxVel = 5,
+    ):
+        center = centers[0]
+        x, y = np.meshgrid(
+            np.arange(-center[0], size_x - center[0]),
+            np.arange(-center[1], size_y - center[1])
+        )
+        r = np.hypot(x, y).astype('float16')
+        o = np.arctan2(y, x).astype('float16')
+        uo = np.zeros(x.size).astype('float16')
+        
+        uoin = (r <= radius)
+        uout = (r > radius)
+        uo = (uoin + uout).astype('float16')
+        
+        uo[uoin] = maxVel * r[uoin] / radius
+        uo[uout] = maxVel * radius / r[uout]
+        uo[uo == np.nan] = 0
+
+        flow_u = -uo * np.sin(o)
+        flow_v = uo * np.cos(o)
+        
+            
+        if len(centers) > 1:
+            center = center[1]
+            x, y = np.meshgrid(
+                np.arange(-center[0], size_x - center[0]),
+                np.arange(-center[1], size_y - center[1])
+            )
+            r = np.hypot(x, y).astype('float16')
+            o = np.arctan2(y, x).astype('float16')
+            uo = np.zeros(x.size).astype('float16')
+
+            uoin = (r <= radius)
+            uout = (r > radius)
+            uo = (uoin + uout).astype('float16')
+
+            uo[uoin] = maxVel * r[uoin] / radius
+            uo[uout] = maxVel * radius / r[uout]
+            uo[uo == np.nan] = 0
+
+            flow_un = (uo * np.sin(o))
+            flow_vn = (uo * np.cos(o))
+
+            flow_u -= flow_un
+            flow_v -= flow_vn
+        return flow_u, flow_v
+    
+    
+    def gen_images(
+        self, 
+        HEIGHT, WIDTH, X, Y,
+        PARTICLE_DIAMETERS, PARTICLE_MAX_INTENSITIES
+    ):
+        """Creates the synthetic image with the synthetic image parameters
+        Should be run with the parameters of each image (first,second) separately.
+
+        Parameters
+        ----------
+        HEIGHT, WIDTH: int
+            The number of pixels in the desired output image.
+
+        X,Y: numpy array
+            The X and Y positions of the particles, created by create_synimage_parameters().
+
+        PARTICLE_DIAMETERS, PARTICLE_MAX_INTENSITIES: numpy array
+            The intensities and diameters of the particles, created by create_synimage_parameters().
+
+        Returns
+        -------
+        Image: numpy array
+            The desired synthetic image.
+
+        """
+        render_fraction = 0.75
+        IMAGE_OUT = np.zeros([HEIGHT, WIDTH])
+
+        minRenderedCols = (X - render_fraction * PARTICLE_DIAMETERS).astype(int)
+        maxRenderedCols = (np.ceil(X + render_fraction * PARTICLE_DIAMETERS)).astype(int)
+        minRenderedRows = (Y - render_fraction * PARTICLE_DIAMETERS).astype(int)
+        maxRenderedRows = (np.ceil(Y + render_fraction * PARTICLE_DIAMETERS)).astype(int)
+
+        index_to_render = []
+
+        for i in range(X.size):
+            if 1<minRenderedCols[i] and maxRenderedCols[i]< WIDTH and 1<minRenderedRows[i] and maxRenderedRows[i]< HEIGHT:
+                index_to_render.append(i)
+
+        for i in range(len(index_to_render)):
+            ind = index_to_render[i]
+            max_int = PARTICLE_MAX_INTENSITIES[ind]
+            par_diam = PARTICLE_DIAMETERS[ind]
+            sqrt8 = np.sqrt(8)
+            x = X[ind]
+            y = Y[ind]
+
+            bl = max(minRenderedCols[ind],0)
+            br = min(maxRenderedCols[ind],WIDTH)
+            bu = max(minRenderedRows[ind],0)
+            bd = min(maxRenderedRows[ind],HEIGHT)
+
+            for c in range(bl,br):
+                cr = (erf( sqrt8 * (c - x - 0.5) / par_diam ) -
+                      erf(sqrt8 * (c - x + 0.5) / par_diam))
+                for r in range(bu,bd):
+                    IMAGE_OUT[r,c] = IMAGE_OUT[r,c] + max_int * cr *\
+                    (erf( sqrt8 * (r - y - 0.5)/ par_diam) - 
+                     erf(sqrt8 *(r - y + 0.5) / par_diam)) * par_diam**2 * np.pi / 32
+        return IMAGE_OUT.astype(int)[::-1]
+
+    
+    def generate_synthetic_images(self, preview = False): # code from OpenPIV-pyhton/synimagegen
+        self.get_settings()
+        if preview == True:
+            dirr = 'none'
+        else:
+            dirr = filedialog.askdirectory()
+        if len(dirr) > 1:
+            image_size = [self.p['sig_size_x'], self.p['sig_size_y']]
+            num_of_par = self.p['sig_part_num']
+            par_diam = self.p['sig_part_dia']
+            par_diam_std = self.p['sig_part_dia_std']
+            x_bound = [0,1]
+            y_bound = [0,1]
+
+            flow_type = self.p['sig_flow']
+            if flow_type in ['linear', 'parabolic']:
+                try:
+                    v_x = [int(self.p['sig_linpar_x_disp'])]
+                    v_y = [int(self.p['sig_linpar_x_disp'])]
+                except:
+                    start = int(self.p['sig_linpar_x_disp'].split[':'][0])
+                    stop = int(self.p['sig_linpar_x_disp'].split[':'][1])
+                    step = int(self.p['sig_linpar_x_disp'].split[':'][2])
+                    v_x = np.mgrid[start:stop:step]
+                    start = int(self.p['sig_linpar_y_disp'].split[':'][0])
+                    stop = int(self.p['sig_linpar_y_disp'].split[':'][1])
+                    step = int(self.p['sig_linpar_y_disp'].split[':'][2])
+                    v_y = np.mgrid[start:stop:step]
+
+            elif flow_type in ['rankine vortex', 'lamb-oseen vortex']:
+                centers = [(self.p['sig_vortex_x1'], self.p['sig_vortex_y1'])]
+                if self.p['sig_second_vortex'] == True:
+                    centers.append((self.p['sig_vortex_x2'], self.p['sig_vortex_y2']))
+                try:
+                    maxVel = [int(self.p['sig_vortex_max_disp'])]
+                except:
+                    start = int(self.p['sig_vortex_max_disp'].split[':'][0])
+                    stop = int(self.p['sig_vortex_max_disp'].split[':'][1])
+                    step = int(self.p['sig_vortex_max_disp'].split[':'][2])
+                    maxVel = np.mgrid[start:stop:step]
+
+            for ind in range(self.p['sig_gen_img_amount']):
+                print('Generating flow field')
+                if flow_type == 'linear':
+                    try:
+                        velx = v_x[ind]
+                    except:
+                        velx = v_x[0]
+                    try:
+                        vely = v_y[ind]
+                    except:
+                        vely = v_y[0]
+                    flow_u, flow_v = self.gen_linear_flow_field(
+                        image_size[0], image_size[1], velx = velx, vely = vely,
+                    )
+                else:
+                    try:
+                        vel = maxVel[ind]
+                    except:
+                        vel = maxVel[0]
+                    flow_u, flow_v = self.gen_rankine_flow_field(
+                        image_size[0], image_size[1],
+                        centers = centers,
+                        radius = self.p['sig_vortex_core'],
+                        maxVel = vel,
+                    )
+                    flow_u = np.flipud(flow_u)
+                    flow_v = np.flipud(flow_v)
+                    flow_v *= -1
+                print('FLow statistics:')
+                mag = np.hypot(flow_u,flow_v)
+                print(f'min mag: {mag.min()}\nmax mag: {mag.max()}')
+                
+                print('Generating particles')
+                x_1 = np.random.uniform(x_bound[0],x_bound[1],num_of_par)
+                y_1 = np.random.uniform(y_bound[0],y_bound[1],num_of_par)
+                par_diam1 = np.random.normal(self.p['sig_part_dia'],self.p['sig_part_dia_std'],num_of_par)
+                par_diam2 = par_diam1#np.zeros(par_diam1.shape)
+
+                Z = self.p['sig_sheet_thick'] # following 14 lines are from PIVlab
+                Z_part = self.p['sig_part_Z']
+
+                z0_pre = np.random.rand(num_of_par)
+                z1_pre = np.random.rand(num_of_par)
+                z0 = z0_pre*(Z_part/200)+z1_pre*(1-Z_part/200)
+                z1 = z1_pre*(Z_part/200)+z0_pre*(1-Z_part/200)
+
+                par_int1 = 255*np.exp(-(Z**2/(0.125*z0**2)))
+                par_int1[par_int1 > 255] = 255
+                par_int1[par_int1 < 0] = 0
+                par_int2 = 255*np.exp(-(Z**2/(0.125*z1**2)))
+                par_int2[par_int2 > 255] = 255
+                par_int2[par_int2 < 0] = 0
+
+                x_2 = np.zeros(x_1.shape)
+                y_2 = np.zeros(y_1.shape)
+                for i in range(len(x_1)):
+                    u_par = flow_u[int(x_1[i]*image_size[0]), int(y_1[i]*image_size[1])]/image_size[0]
+                    v_par = flow_v[int(x_1[i]*image_size[0]), int(y_1[i]*image_size[1])]/image_size[1]
+                    x_1[i] = x_1[i] - u_par / 2
+                    y_1[i] = y_1[i] - v_par / 2
+                    x_2[i] = x_1[i] + u_par
+                    y_2[i] = y_1[i] + v_par
+
+                xy_1 = np.transpose(np.vstack((x_1,y_1,par_diam1,par_int1)))
+                xy_2 = np.transpose(np.vstack((x_2,y_2,par_diam2,par_int2)))
+
+                #Choosing particles in boundary area
+                bounded_xy_1 = np.asarray([xy for xy in xy_1 if x_bound[1]>=xy[0]>=x_bound[0] and y_bound[1]>=xy[1]>=y_bound[0]])
+                bounded_xy_2 = np.asarray([xy for xy in xy_2 if x_bound[1]>=xy[0]>=x_bound[0] and y_bound[1]>=xy[1]>=y_bound[0]])
+
+                #Tranforming coordinates into pixels
+                x1 = ((bounded_xy_1[:,0]-x_bound[0])/(x_bound[1]-x_bound[0]))*image_size[0]
+                y1 = ((bounded_xy_1[:,1]-y_bound[0])/(y_bound[1]-y_bound[0]))*image_size[1]
+
+                x2 = ((bounded_xy_2[:,0]-x_bound[0])/(x_bound[1]-x_bound[0]))*image_size[0]
+                y2 = ((bounded_xy_2[:,1]-y_bound[0])/(y_bound[1]-y_bound[0]))*image_size[1]
+                
+                print('Generating A image')
+                img_a = self.gen_images(
+                    image_size[0], image_size[1],
+                    x1, y1, bounded_xy_1[:,2], bounded_xy_1[:,3], 
+                )
+                img_a[img_a>255] = 255
+                print('Image A statistics:')
+                print(f'min int: {img_a.min()}\nmax int: {img_a.max()}')
+                print('Generating B image')
+                img_b = self.gen_images(
+                    image_size[0], image_size[1],
+                    x2, y2, bounded_xy_2[:,2], bounded_xy_2[:,3],  
+                )
+                img_b[img_b>255] = 255
+                print('Image B statistics:')
+                print(f'min int: {img_a.min()}\nmax int: {img_a.max()}')
+                
+                if preview == True:
+                    break;
+                else:
+                    filename = os.path.join(
+                        dirr, 
+                        self.p['sig_fname'].format(
+                            str(ind).zfill(math.ceil(math.log10(self.p['sig_gen_img_amount'])))
+                        ) + 'a.bmp'
+                    )
+                    piv_tls.imsave(filename, img_a.astype('uint8'))
+                    filename = os.path.join(
+                        dirr, 
+                        self.p['sig_fname'].format(
+                            str(ind).zfill(math.ceil(math.log10(self.p['sig_gen_img_amount'])))
+                        ) + 'b.bmp'
+                    )
+                    piv_tls.imsave(filename, img_b.astype('uint8'))
+            
+            
     def show(self, fname, extFig = None, bypass = False, preview = False, preproc = True, show_results=True,
              results = None, show_mask = True, perform_check = True, ignore_blank = False):
         '''Display a file.
@@ -4658,7 +5000,10 @@ class OpenPivGui(tk.Tk):
             if processed_frame: 
                 x = np.array(results['x']) + results.attrs['offset_x']
                 y = np.array(results['y']) + results.attrs['offset_y']
-                s2n = np.array(results['s2n'])
+                peak2peak = np.array(results['peak2peak'])
+                peak2mean = np.array(results['peak2mean'])
+                corrMax = np.array(results['corrMax'])
+                
                 if 'u_vld' in results:
                     if self.p['debug']:
                         print('Show: Loaded validated vectors')
@@ -4712,13 +5057,15 @@ class OpenPivGui(tk.Tk):
                 self.results = [
                     process_time, #processed_frame,
                     x, y, u, v,
-                    tp, s2n,
+                    tp, peak2mean,
                     mask_coords,
                     roi_present,
                     roi_coords,
                     process_time,
                     self.scale_dist,
-                    self.scale_vel,                        
+                    self.scale_vel,  
+                    peak2peak,
+                    corrMax,
                 ] 
                 if self.p['debug']:
                     print('Show: Saved current results')
@@ -4751,6 +5098,7 @@ class OpenPivGui(tk.Tk):
                 xmax = roi_coords[1]
                 ymin = roi_coords[2]
                 ymax = roi_coords[3]
+                
                 if self.p['autoscale_vectors']:
                     autoden = np.hypot(
                         x.max(), y.max()

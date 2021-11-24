@@ -51,8 +51,7 @@ def widget_list():
         'limit_peak_search_last':[
             'limit_peak_search_distance_last'
         ],
-        'do_s2n':[
-            's2n_method',
+        'do_corr_stats':[
             's2n_mask',
         ],
         'manual_select_cores':[
@@ -63,6 +62,10 @@ def widget_list():
         ],
         'contours_uniform_color':[
             'contour_color',
+        ],
+        'sig_second_vortex':[
+            'sig_vortex_x2',
+            'sig_vortex_y2',
         ]
     }
     return widgets
@@ -72,14 +75,15 @@ def disabled_widgets():
         'starting_ref_point',
         'ending_ref_point',
         'reference_dist',
-        #'average_results',
         'statistics_vec_amount',
         'statistics_vec_time',
         'statistics_vec_time2',
         'statistics_vec_valid',
         'statistics_vec_invalid',
         'statistics_vec_masked',
-        'statistics_s2n_mean',
+        'statistics_peak2mean',
+        'statistics_peak2peak',
+        'statistics_pcorr',
         #'point_a_coords',
         #'point_b_coords',
         #'point_ab_distance',
