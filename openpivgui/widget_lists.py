@@ -63,10 +63,6 @@ def widget_list():
         'contours_uniform_color':[
             'contour_color',
         ],
-        'sig_second_vortex':[
-            'sig_vortex_x2',
-            'sig_vortex_y2',
-        ]
     }
     return widgets
 

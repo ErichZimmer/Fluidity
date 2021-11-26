@@ -2025,7 +2025,7 @@ class OpenPivParams():
             'sig_linear':
                 [11650, 'sub_labelframe', None, 
                  None,
-                 'Linear/parabolic flow simulation',
+                 'Non-vortex flow simulation',
                  None],
             
             'sig_linpar_x_disp':
@@ -2044,30 +2044,15 @@ class OpenPivParams():
                  'Vortex flow simulation',
                  None],
             
-            'sig_vortex_x1':
-                [11661, 'sub_int', 256, None,
+            'sig_vortex_x':
+                [11661, 'sub', '256', None,
                  'vortex center (x-axis) [px]',
                  'Where to place the center of the first vortex in the x-axis.'],
             
-            'sig_vortex_y1':
-                [11662, 'sub_int', 256, None,
+            'sig_vortex_y':
+                [11662, 'sub', '256', None,
                  'vortex center (y-axis) [px]',
                  'Where to place the center of the first vortex in the y-axis.'],
-            
-            'sig_second_vortex':
-                [11663, 'sub_bool', False, 'bind',
-                 'generate second vortex',
-                 'Generate a second vortex in the flow field.'],
-            
-            'sig_vortex_x2':
-                [11664, 'sub_int', 256, None,
-                 'vortex center (x-axis) [px]',
-                 'Where to place the center of the second vortex in the x-axis.'],
-            
-            'sig_vortex_y2':
-                [11665, 'sub_int', 256, None,
-                 'vortex center (y-axis) [px]',
-                 'Where to place the center of the second vortex in the y-axis.'],
             
             'sig_vortex_core':
                 [11666, 'sub_int', 5, None,
@@ -2081,7 +2066,7 @@ class OpenPivParams():
             
             'sig_preview':
                 [11685, 'button_static_c', None, 
-                 "print('Not implemented')",
+                 "self.generate_synthetic_images(preview = True)",
                  'Preview synthetic image',
                  None],
             

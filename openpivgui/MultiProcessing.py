@@ -38,10 +38,8 @@ __email__ = 'vennemann@fh-muenster.de'
 
 class MultiProcessing(piv_tls.Multiprocesser):
     '''Parallel processing, based on the corrresponding OpenPIV class.
-
     Do not run from the interactive shell or within IDLE! Details at:
     https://docs.python.org/3.6/library/multiprocessing.html#using-a-pool-of-workers
-
     Parameters
     ----------
     params : OpenPivParams
@@ -52,7 +50,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
         self,
         params,
         settings = None, 
-        session = None,
         files_a = None,
         files_b = None,
         disp_off = 0,
@@ -69,7 +66,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
         self.preproc = params.preprocessing_methods
         self.postproc = params.postprocessing_methods
         self.settings = settings
-        self.session = session
         self.files_a = files_a
         self.files_b = files_b
         self.bg_a = bg_a
@@ -284,7 +280,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         def irfft2_6(aa, s=None, axes = (-2,-1)):
                             return fft_backward_6(aa)
                         self.irfft_plans[f'pass_{i}'] = irfft2_6
-
                 else:
                     break;
             print('Using python wrapper of FFTW library')
@@ -308,7 +303,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
     
     def process(self, args):
         '''Process chain as configured in the GUI.
-
         Parameters
         ----------
         args : tuple
@@ -811,14 +805,67 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['x'] = x
         results['y'] = y
         results['u'] = u
-        results['v'] = -v 
+        results['v'] = v 
         results['tp'] = flag
         results['xymask'] = xymask
         results['peak2peak'] = peak2peak
         results['peak2mean'] = peak2mean
         results['corrMax'] = corrMax
         
-            
+        '''
+        # Doesn't raise error, but doesn't append to group either
+        with h5py.File(self.session_path, 'a') as session:
+            print(f'Storing frame {i}')
+            frame = session['results'][f'frame_{i}']
+            frame.attrs['processed']    = True
+            frame.attrs['roi_present']  = roi_present
+            frame.attrs['roi_coords']   = [roi_xmin, roi_xmax, roi_ymin, roi_ymax]
+            frame.attrs['mask_coords']  = str(mask_c)
+            frame.attrs['process_time'] = _round((end - start), 3)
+
+            frame.attrs['offset_x']   = 0
+            frame.attrs['offset_y']   = 0
+            try:
+                test = frame.attrs['scale_dist']
+            except:
+                frame.attrs['scale_dist'] = 1
+                frame.attrs['scale_vel']  = 1
+                frame.attrs['units']      = ['px', 'dt']
+                frame.attrs['origin']     = 'top-left'
+
+            if 'x' in frame: del frame['x']
+            if 'y' in frame: del frame['y']
+            if 'u' in frame: del frame['u']
+            if 'v' in frame: del frame['v']
+            if 'tp' in frame: del frame['tp']
+            if 'xymask' in frame: del frame['xymask']
+            if 'peak2peak' in frame: del frame['peak2peak']
+            if 'peak2mean' in frame: del frame['peak2mean']
+            if 'corrMax' in frame: del frame['corrMax']
+            if 'corr' in frame: del frame['corr']
+                
+            frame.create_dataset('x', data = x)
+            frame.create_dataset('y', data = y)
+            frame.create_dataset('u', data = u)
+            frame.create_dataset('v', data = v)
+            frame.create_dataset('tp', data = flag)
+            frame.create_dataset('xymask', data = xymask)
+            frame.create_dataset('peak2peak', data = peak2peak)
+            frame.create_dataset('peak2mean', data = peak2mean)
+            frame.create_dataset('corrMax', data = corrMax)
+            if self.parallel == False:
+                frame.create_dataset('corr', data = corr)
+            del corr
+
+            if 'u_vld' in frame:
+                del frame['u_vld']
+                del frame['v_vld']
+                del frame['tp_vld']
+
+            if 'u_mod' in frame:
+                del frame['u_mod']
+                del frame['v_mod']
+        '''
         # additional information of evaluation
         time_per_vec = _round((((end - start) * 1000) / u.size), 3)
         print('Processed frame: {}'.format(counter))
@@ -1486,7 +1533,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
         results['x'] = x
         results['y'] = y
         results['u'] = u
-        results['v'] = -v
+        results['v'] = v
         results['tp'] = np.zeros_like(x)
         results['xymask'] = xymask
         results['peak2peak'] = np.zeros_like(x)
