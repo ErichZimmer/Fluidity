@@ -7,7 +7,7 @@ import openpiv.tools as piv_tls
 
 
 # check number of images, image types, and window sizing
-def check_PIVprocessing(self, roi):
+def check_PIVprocessing(self, roi: list) -> None:
     self.p = self
     '''Error checking'''
     # making sure there are 2 or more files loaded
@@ -113,7 +113,7 @@ def check_PIVprocessing(self, roi):
         else:
             break
 
-def check_processing(self):  # check for threads
+def check_processing(self) -> None:  # check for threads
     self = self
     message = 'Please stop all threads/processes to start processing.'
     checker = 0

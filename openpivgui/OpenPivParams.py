@@ -727,7 +727,7 @@ class OpenPivParams():
                     #'hann',
                     'hamming',
                   ),
-                 'window weighting',
+                 'window weighting (experimental)',
                  'Window weighting function applied to the interrogation windows.'],# and '+
                  #'correlation matrix (multiplied by autocorrelation of weighting function).'],
             
@@ -1514,10 +1514,6 @@ class OpenPivParams():
                  ' For histogram only the v-velocity component is needed.'],
             
             
-            
-            
-            
-            
             # plot preferences
             'modify_plot_appearance':
                 [8600, None, None, None,
@@ -1679,6 +1675,7 @@ class OpenPivParams():
                  None,
                  None],
         
+            
         # exporting current figure
             'export_1':
                 [11000, None, None, None,
@@ -1767,39 +1764,111 @@ class OpenPivParams():
                  'file name',
                  'What to call the exported result(s).'],
             
-            'export2_components':
-                [11118, 'str', 'x,y,u,v,flag', ('x,y,u,v',
-                                                'x,y,u,v,flag', 
-                                                'x,y,u,v,flag,s2n',
-                                                'x,y,u,v,s2n,flag'),
-                 'components',
-                 'Which components to save.\n' +
-                 'flag values: 0 = valid; 1 = invalid'],
+            'export2_header':
+                [11118, 'str', 'none', ('none', 'components', 'variables',),
+                 'header',
+                 'Header.'],
+            
+            'export2_components_frame':
+                [11119, 'sub_labelframe', None, 
+                 None,
+                 'Components',
+                 None],
+            
+            'export2_x':
+                [11120, 'sub_bool', True, None,
+                 'x',
+                 'Save x-component.'],
+            
+            'export2_y':
+                [11121, 'sub_bool', True, None,
+                 'y',
+                 'Save y-component.'],
+            
+            'export2_u':
+                [11122, 'sub_bool', True, None,
+                 'u',
+                 'Save u-component.'],
+            
+            'export2_v':
+                [11123, 'sub_bool', True, None,
+                 'v',
+                 'Save v-component.'],
+            
+            'export2_flag':
+                [11124, 'sub_bool', False, None,
+                 'flag',
+                 'Save flag.\n0 = Valid\n1 = Invalid\n2 = Interpolated.'],
+            
+            'export2_mask':
+                [11125, 'sub_bool', False, None,
+                 'mask',
+                 'Save mask. \n0 = not masked\n1 = masked'],
+            
+            'export2_peak2mean':
+                [11126, 'sub_bool', False, None,
+                 'peak2mean',
+                 'Save peak-to-mean ratio.'],
+            
+            'export2_peak2peak':
+                [11127, 'sub_bool', False, None,
+                 'peak2peak',
+                 'Save peak-to-peak ratio.'],
+            
+            'export2_magnitude':
+                [11128, 'sub_bool', False, None,
+                 'magnitude',
+                 'Save velocity magnitude.'],
+            
+            'export2_vorticity':
+                [11129, 'sub_bool', False, None,
+                 'vorticity',
+                 'Save vorticity.'],
+            
+            'export2_enstrophy':
+                [11130, 'sub_bool', False, None,
+                 'enstrophy',
+                 'Save enstrophy.'],
+            
+            'export2_shear_strain':
+                [11131, 'sub_bool', False, None,
+                 'shear strain',
+                 'Save shear strain.'],
+            
+            'export2_normal_strain':
+                [11132, 'sub_bool', False, None,
+                 'normal strain',
+                 'Save normal strain.'],
+            
+            'export2_kinetic_energy':
+                [11133, 'sub_bool', False, None,
+                 'kinetic energy',
+                 'Save kinetic energy.'],
             
             'asci2_delimiter':
-                [11119, 'str', 'tab', ('tab', 'space', ',', ';'),
+                [11139, 'str', 'tab', ('tab', 'space', ',', ';'),
                  'delimiter',
                  'Delimiter to differentiate the columns of the vector components.'],
             
             'asci2_extension':
-                [11120, 'str', '.vec', ('.txt', '.vec', '.dat'),
+                [11140, 'str', '.vec', ('.txt', '.vec'),
                  'extension',
                  'File extension.'],
             
             'export2_set_masked_values':
-                [11121, 'str', 'zero', ('NaN', 'zero'),
+                [11141, 'dummy', 'zero', ('NaN', 'zero'),
                  'set masked values to:',
                  'Set masked u and v components to selected option.\n' +
                  'Warning: setting values to Nan is experimental.'],
             
              'export2_current_button':
-                [11130, 'button_static_c', None, 
+                [11150, 'button_static_c', None, 
                  "self.export_asci2(index = self.index)",
                  'Export current frame',
                  None],
             
             'export2_all_button':
-                [11140, 'button_static_c', None, 
+                [11155, 'button_static_c', None, 
                  "self.export_asci2()",
                  'Export all frame(s)',
                  None],
@@ -2092,15 +2161,15 @@ class OpenPivParams():
         self.add_parameters(self.default)
 
         
-    def __getitem__(self, key):
+    def __getitem__(self, key: str):
         return self.param[key]
 
     
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value) -> None: # varies
         self.param[key] = value
 
         
-    def load_settings(self, fname):
+    def load_settings(self, fname: str) -> None:
         """
             Read parameters from a JSON file.
 
@@ -2124,7 +2193,7 @@ class OpenPivParams():
                     self.param[key] = p[key]
 
                     
-    def dump_settings(self, fname):
+    def dump_settings(self, fname: str) -> None:
         """
             Dump parameter values to a JSON file.
 
@@ -2143,7 +2212,7 @@ class OpenPivParams():
             print('Unable to save settings: ' + fname)
 
             
-    def generate_parameter_documentation(self, group=None):
+    def generate_parameter_documentation(self, group: int = None) -> str:
         """
             Return parameter labels and help as reStructuredText def list.
 

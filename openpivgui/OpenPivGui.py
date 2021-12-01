@@ -3560,12 +3560,12 @@ class OpenPivGui(tk.Tk):
                     print(f'Saving frame {i}')
                     self.process_type.config(text = f'Saving frame {i}')
                     results = self.session['results'][f'frame_{i}']
+                    
                 if results.attrs['processed']:
-                    x = np.array(results['x'])
-                    y = np.array(results['y'])
-                    s2n = np.array(results['s2n'])
-                    roi_present  = results.attrs['roi_present']                             
-                    roi_coords   = results.attrs['roi_coords']
+                    x = np.array(results['x'][:], 'int16')
+                    y = np.array(results['y'][:], 'int16')
+                    roi_present = results.attrs['roi_present']                             
+                    roi_coords  = results.attrs['roi_coords']
                     
                     if 'u_vld' in results:
                         if self.p['debug']:
@@ -3589,9 +3589,7 @@ class OpenPivGui(tk.Tk):
                             print('Show: Loaded unprocessed vectors')
                         u = np.array(results['u'])
                         v = np.array(results['v'])
-                        flag = np.array(results['tp'])  
-                    x = x.astype(np.int)
-                    y = y.astype(np.int)
+                        flag = np.array(results['tp']) 
                     
                     if roi_present:
                         if self.p['debug']:
@@ -3599,24 +3597,20 @@ class OpenPivGui(tk.Tk):
                         x += int(roi_coords[0])
                         y += int(roi_coords[2])
                         
-                    mask = list(literal_eval(results.attrs['mask_coords']))
-                    if mask == []:
-                        mask = np.full_like(x, False)
-                    else:
-                        mask = coords_to_xymask(x, y, mask)
-                        mask = mask.astype(bool).reshape(u.shape)
+                    mask = np.array(results['xymask'][:], 'int16').reshape(x.shape)
                     
                     if roi_present:
                         x -= int(roi_coords[0])
                         y -= int(roi_coords[2])
                         
                     if self.p['export2_set_masked_values'] == 'NaN':
-                        u[mask == True] = np.nan
-                        v[mask == True] = np.nan
+                        u[mask == 1] = np.nan
+                        v[mask == 1] = np.nan
                     else:
-                        u[mask == True] = 0
-                        v[mask == True] = 0
-                    flag[mask == True] = 1
+                        u[mask == 1] = 0
+                        v[mask == 1] = 0
+                        
+                    flag[mask == 1] = 1
                     
                     if self.p['asci2_delimiter'] == 'tab':
                         delimiter = '\t'
@@ -3631,17 +3625,59 @@ class OpenPivGui(tk.Tk):
                             str(i).zfill(math.ceil(math.log10(len(self.p['fnames']))))
                         ) + self.p['asci2_extension']
                     )
+                    names = 'VARIABLES=X,Y,U,V'
+                    components = [x,y,u,v]
+                    if self.p['export2_flag']:
+                        components.append(flag)
+                        names = names + ',FLAG'
+                    if self.p['export2_mask']:
+                        components.append(mask)
+                        names = names + ',IS_MASKED'
+                    if self.p['export2_peak2mean']:
+                        components.append(np.array(results['peak2mean'][:]).reshape(x.shape)) # just in case
+                        names = names + ',PEAK2MEAN'
+                    if self.p['export2_peak2peak']:
+                        components.append(np.array(results['peak2peak'][:]).reshape(x.shape))
+                        names = names + ',PEAK2PEAK'
+                    if self.p['export2_magnitude']:
+                        components.append(vec_plot.get_component(
+                            x, y, u, v, 'magnitude',
+                        ))
+                        names = names + ',MAGNITUDE'
+                    if self.p['export2_vorticity']:
+                        components.append(vec_plot.get_component(
+                            x, y, u, v, 'vorticity',
+                        ))
+                        names = names + ',VORTICITY'
+                    if self.p['export2_enstrophy']:
+                        components.append(vec_plot.get_component(
+                            x, y, u, v, 'enstrophy',
+                        ))
+                        names = names + ',ENSTROPHY'
+                    if self.p['export2_shear_strain']:
+                        components.append(vec_plot.get_component(
+                            x, y, u, v, 'shear strain',
+                        ))
+                        names = names + ',SHEAR_STRAIN'
+                    if self.p['export2_normal_strain']:
+                        components.append(vec_plot.get_component(
+                            x, y, u, v, 'normal strain',
+                        ))
+                        names = names + ',NORMAL_STRAIN'
+                    if self.p['export2_kinetic_energy']:
+                        components.append(vec_plot.get_component(
+                            x, y, u, v, 'kinetic energy',
+                        ))
+                        names = names + ',KINETIC_ENERGY'
                     
-                    if self.p['export2_components'] == 'x,y,u,v,flag':
-                        components = [x,y,u,v,flag]
-                    elif self.p['export2_components'] == 'x,y,u,v,flag,s2n':
-                        components = [x,y,u,v,flag,s2n]
-                    elif self.p['export2_components'] == 'x,y,u,v,s2n,flag':
-                        components = [x,y,u,v,s2n,flag]
+                    if self.p['export2_header'] == 'components':
+                        header = names
+                    elif self.p['export2_header'] == 'variables':
+                        header = names + f'\nZONE T=FRAME_{i},I={x.shape[0]},J={x.shape[1]}'
                     else:
-                        components = [x,y,u,v]
-                        
-                    save(components, filename = filename, delimiter = delimiter)
+                        header = ''
+                    save(components, filename = filename, delimiter = delimiter, header = header)
+                    
                     if self.p['fnames'][i] == 'Average':
                         print('Saved frame Average')
                         self.process_type.config(text = 'Saved frame Average')
@@ -5032,6 +5068,7 @@ class OpenPivGui(tk.Tk):
                         ) + 'a.bmp'
                     )
                     piv_tls.imsave(filename, img_a.astype('uint8'))
+                    
                     filename = os.path.join(
                         dirr, 
                         self.p['sig_fname'].format(
@@ -5039,6 +5076,17 @@ class OpenPivGui(tk.Tk):
                         ) + 'b.bmp'
                     )
                     piv_tls.imsave(filename, img_b.astype('uint8'))
+                    
+                    filename = os.path.join(
+                        dirr, 
+                        self.p['sig_fname'].format(
+                            str(ind).zfill(math.ceil(math.log10(self.p['sig_gen_img_amount'])))
+                        ) + 'disp.npy'
+                    )
+                    if flow_type in ['rankine vortex']:
+                        flow_u, flow_v = -flow_u, -flow_v
+                    np.save(filename, np.array([flow_u, flow_v])) 
+                    print('Saved exact flow simulation')
             
             
     def show(self, fname, extFig = None, bypass = False, preview = False, preproc = True, show_results=True,

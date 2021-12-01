@@ -1,4 +1,4 @@
-def button_list():
+def button_list() -> list:
     buttons = [
         'remove_current_image',
         'apply_frequence_button',
@@ -35,7 +35,7 @@ def button_list():
     ]
     return buttons
 
-def widget_list():
+def widget_list() -> dict:
     widgets = {
         'custom_sequence':[
             'stride',
@@ -66,7 +66,7 @@ def widget_list():
     }
     return widgets
 
-def disabled_widgets():
+def disabled_widgets() -> list:
     widgets = [
         'starting_ref_point',
         'ending_ref_point',
@@ -80,6 +80,10 @@ def disabled_widgets():
         'statistics_peak2mean',
         'statistics_peak2peak',
         'statistics_pcorr',
+        'export2_x',
+        'export2_y',
+        'export2_u',
+        'export2_v',
         #'point_a_coords',
         #'point_b_coords',
         #'point_ab_distance',

@@ -78,18 +78,39 @@ class MultiProcessing(piv_tls.Multiprocesser):
         self.irfft_plans = {}
         print('Generating FFT object')
         self.parameter['pass_1'] = True
-        try: # example of using different fft libraries, is also done inefficiently
+        try: # example of using different fft libraries, is also done inefficiently for FFTW
             if self.parameter['use_FFTW'] != True:# or self.parallel == True:
                 raise Exception('Disabled FFTW via exception')
-            def rfft2(aa, s = [], axes = (-2,-1)):
-                fft_mem = FFTW.empty_aligned(aa.shape, dtype = 'float32')
-                if len(s) < 1: s = None
-                fft_forward = FFTW.builders.rfft2(fft_mem, s = s, axes = axes)
+                
+            def rfft2(aa, s = [], axes = (-2,-1), dtype = 'float32,complex64'):
+                if dtype == 'float32,complex64':
+                    in_dtype = 'float32'
+                    out_dtype = 'complex64'
+                else:
+                    in_dtype = 'float64'
+                    out_dtype = 'complex128'
+                    
+                if len(s) < 1:
+                    #print('\n\n'+str(s)+'\n\n\n')
+                    #aa = np.pad(
+                    #    aa, ((0,0), (s[0]//2,s[0]//2), (s[1]//2,s[1]//2)),
+                    #    'constant',
+                    #    constant_values = (0.0)
+                    #)
+                    s = None
+                fft_in = FFTW.empty_aligned(aa.shape, dtype = in_dtype)
+                fft_forward = FFTW.builders.rfft2(fft_in, s = s, axes = axes)
                 return fft_forward(aa)
             
-            def irfft2(aa, axes = (-2,-1)):
-                fft_mem = FFTW.empty_aligned(aa.shape, dtype = 'complex64')
-                fft_backward = FFTW.builders.irfft2(fft_mem, axes = axes)
+            def irfft2(aa, axes = (-2,-1), dtype = 'float32,complex64'):
+                if dtype == 'float32,complex64':
+                    in_dtype = 'complex64'
+                    out_dtype = 'float32'
+                else:
+                    in_dtype = 'complex128'
+                    out_dtype = 'float64'
+                fft_in = FFTW.empty_aligned(aa.shape, dtype = in_dtype)
+                fft_backward = FFTW.builders.irfft2(fft_in, axes = axes)
                 return fft_backward(aa)
             
             ''' # can't use parallel processing/ uses too much memory
@@ -450,6 +471,9 @@ class MultiProcessing(piv_tls.Multiprocesser):
         print('Evaluating frame: {}'.format(counter + self.disp_off))
         # evaluation first pass
         start = time.time() 
+        dad = self.parameter['disable_autocorrelation_distance']
+        dad = [dad, dad]
+        
         if len(self.precomp_fp) > 0 and passes > 1:
             x = self.precomp_fp[0]
             y = self.precomp_fp[1]
@@ -458,15 +482,18 @@ class MultiProcessing(piv_tls.Multiprocesser):
         else:
             limit_peak_search = False
             peak_distance = None
+            
             if self.parameter['limit_peak_search_each']:
                 limit_peak_search = True
                 if self.parameter['limit_peak_search_auto_each'] != True:
                     peak_distance = self.parameter['limit_peak_search_distance_each']
-
+                    peak_distance = [peak_distance, peak_distance]
+                    
             if passes == 1 and self.parameter['limit_peak_search_last'] == True:
                 limit_peak_search = True
                 peak_distance = self.parameter['limit_peak_search_distance_last']
-
+                peak_distance = [peak_distance, peak_distance]
+                
             x, y, u, v, corr = pivware.firstpass(
                 frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                 window_size                = corr_window,
@@ -476,9 +503,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 subpixel_method            = self.parameter['subpixel_method'],
                 offset_correlation         = self.parameter['offset_corr_subpix'],
                 correlation_method         = self.parameter['corr_method'],
-                weight                     = corr_windowing,
+                weight                     = self.parameter['window_weighting'],
+                weight_sigma               = self.parameter['window_weighting_sigma'],
                 disable_autocorrelation    = self.parameter['disable_autocorrelation'],
-                autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
+                autocorrelation_distance   = dad,
                 limit_peak_search          = limit_peak_search,
                 limit_peak_search_distance = peak_distance,
                 rfft2  = self.rfft_plans['pass_1'],
@@ -517,6 +545,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         local_median = False,
                     )
                     print('Mean peak-to-peak ratio: '+str(sig2noise.mean()))
+                    
                 if self.parameter['fp_peak2mean_validation'] == True:
                     sig2noise = piv_prc.vectorized_sig2noise_ratio(
                         corr, 
@@ -614,17 +643,20 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         ]
 
                 limit_peak_search = False
-                peak_distance = None
+                peak_distance = [0, 0]
 
                 if self.parameter['limit_peak_search_each']:
                     limit_peak_search = True
                     if self.parameter['limit_peak_search_auto_each'] != True:
                         peak_distance = self.parameter['limit_peak_search_distance_each']
+                        peak_distance = [peak_distance, peak_distance]
+                        
 
                 if i == passes and self.parameter['limit_peak_search_last'] == True:
                     limit_peak_search = True
                     peak_distance = self.parameter['limit_peak_search_distance_last']
-
+                    peak_distance = [peak_distance, peak_distance]
+                    
                 x, y, u, v, corr = pivware.multipass(
                     frame_a.astype(img_dtype), frame_b.astype(img_dtype),
                     corr_window,
@@ -643,9 +675,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                     subpixel_method            = self.parameter['subpixel_method'],
                     offset_correlation         = self.parameter['offset_corr_subpix'],
                     deformation_method         = self.parameter['deformation_method'],
-                    weight                     = corr_windowing,
+                    weight                     = self.parameter['window_weighting'],
+                    weight_sigma               = self.parameter['window_weighting_sigma'],
                     disable_autocorrelation    = self.parameter['disable_autocorrelation'],
-                    autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
+                    autocorrelation_distance   = dad,
                     limit_peak_search          = limit_peak_search,
                     limit_peak_search_distance = peak_distance,
                     rfft2 = self.rfft_plans[f'pass_{1}'],
@@ -896,10 +929,6 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 passes += 1
             else:
                 break;
-        if self.parameter['window_weighting'] == 'gaussian':
-            corr_windowing = ('gaussian', self.parameter['window_weighting_sigma'])
-        else:
-            corr_windowing = self.parameter['window_weighting']
 
         # setup custom windowing
         try:
@@ -923,16 +952,20 @@ class MultiProcessing(piv_tls.Multiprocesser):
         s = self.parameter['smoothn_val1']
             
         limit_peak_search = False
-        peak_distance = None
+        peak_distance = [0,0]
         if self.parameter['limit_peak_search_each']:
             limit_peak_search = True
             if self.parameter['limit_peak_search_auto_each'] != True:
-                 peak_distance = self.parameter['limit_peak_search_distance_each']
-
+                peak_distance = self.parameter['limit_peak_search_distance_each']
+                peak_distance = [peak_distance, peak_distance]
+                
         if passes == 1 and self.parameter['limit_peak_search_last'] == True:
             limit_peak_search = True
             peak_distance = self.parameter['limit_peak_search_distance_last']
-
+            peak_distance = [peak_distance, peak_distance]
+            
+        dad = self.parameter['disable_autocorrelation_distance']
+        dad = [dad, dad]
         start = time.time()
         for counter in range(len(self.files_a)):
             if self.parameter['analysis'] != True:
@@ -1045,9 +1078,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                 algorithm                  = self.parameter['algorithm'],
                 subpixel_method            = self.parameter['subpixel_method'],
                 correlation_method         = self.parameter['corr_method'],
-                weight                     = corr_windowing,
+                weight                     = self.parameter['window_weighting'],
+                weight_sigma               = self.parameter['window_weighting_sigma'],
                 disable_autocorrelation    = self.parameter['disable_autocorrelation'],
-                autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
+                autocorrelation_distance   = dad,
                 limit_peak_search          = limit_peak_search,
                 limit_peak_search_distance = peak_distance,
                 rfft2                      = self.rfft_plans[f'pass_{1}'],
@@ -1211,16 +1245,18 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         ]
                     
                 limit_peak_search = False
-                peak_distance = None
+                peak_distance = [0,0]
             
                 if self.parameter['limit_peak_search_each']:
                     limit_peak_search = True
                     if self.parameter['limit_peak_search_auto_each'] != True:
                         peak_distance = self.parameter['limit_peak_search_distance_each']
+                        peak_distance = [peak_distance, peak_distance]
                         
                 if i == passes and self.parameter['limit_peak_search_last'] == True:
                     limit_peak_search = True
                     peak_distance = self.parameter['limit_peak_search_distance_last']
+                    peak_distance = [peak_distance, peak_distance]
                                 
                 for counter in range(len(self.files_a)):
                     if self.parameter['analysis'] != True:
@@ -1340,9 +1376,10 @@ class MultiProcessing(piv_tls.Multiprocesser):
                         correlation_method         = self.parameter['corr_method'],
                         subpixel_method            = self.parameter['subpixel_method'],
                         deformation_method         = self.parameter['deformation_method'],
-                        weight                     = corr_windowing,
+                        weight                     = self.parameter['window_weighting'],
+                        weight_sigma               = self.parameter['window_weighting'],
                         disable_autocorrelation    = self.parameter['disable_autocorrelation'],
-                        autocorrelation_distance   = self.parameter['disable_autocorrelation_distance'],
+                        autocorrelation_distance   = dod,
                         limit_peak_search          = limit_peak_search,
                         limit_peak_search_distance = peak_distance,
                         rfft2                      = self.rfft_plans[f'pass_{1}'],
@@ -1552,23 +1589,25 @@ from scipy.stats import pearsonr
 
 class pivware():    
     def firstpass(
-        frame_a, frame_b,
-        window_size = 64,
-        overlap = 32,
-        algorithm = 'Standard FFT correlation',
-        normalize_intensity = False,
-        normalized_correlation = False,
-        correlation_method = "circular",
-        weight = 'boxcar',
-        disable_autocorrelation = False,
-        autocorrelation_distance = 1,
-        limit_peak_search = False,
-        limit_peak_search_distance = None,
-        subpixel_method = "gaussian",
-        offset_correlation = True,
-        do_sig2noise = False,
-        sig2noise_method = 'peak2mean',
-        sig2noise_mask = 2,
+        frame_a: np.ndarray,
+        frame_b: np.ndarray,
+        window_size: list = [64, 64],
+        overlap: list = [32, 32],
+        algorithm: str = 'Standard FFT correlation',
+        normalize_intensity: bool = False,
+        normalized_correlation: bool = False,
+        correlation_method: str = "circular",
+        weight: str = 'boxcar',
+        weight_sigma: int = 8,
+        disable_autocorrelation: bool = False,
+        autocorrelation_distance: list = [0,0],
+        limit_peak_search: bool = False,
+        limit_peak_search_distance: list = [0,0],
+        subpixel_method: str = "gaussian",
+        offset_correlation: bool = True,
+        do_sig2noise: bool = False,
+        sig2noise_method: str = 'peak2mean',
+        sig2noise_mask: int = 2,
         rfft2 = fft.rfft2,
         irfft2 = fft.irfft2,
     ):      
@@ -1595,6 +1634,9 @@ class pivware():
             overlap
         )
         
+        if weight == 'gaussian':
+            weight = (weight, weight_sigma)
+            
         weight_y = get_window(weight, aa.shape[-2])
         weight_x = get_window(weight, aa.shape[-1])
         weight = np.outer(weight_y, weight_x).astype('float32')
@@ -1689,30 +1731,35 @@ class pivware():
     
     
     def multipass(
-        frame_a,frame_b,
-        window_size,
-        overlap,
-        iterations,
-        current_iteration,
-        x_old, y_old, u_old, v_old,
-        algorithm = 'Standard FFT Correlation',
-        normalize_intensity = False,
-        normalized_correlation = False,
-        correlation_method = "circular",
-        deformation_method = "second image",
-        interpolation_order1 = 3,
-        interpolation_order2 = 3,
-        interpolation_order3 = 3,
-        weight = 'boxcar',
-        disable_autocorrelation = False,
-        autocorrelation_distance = 1,
-        limit_peak_search = False,
-        limit_peak_search_distance = None,
-        subpixel_method = "gaussian",
-        offset_correlation = True,
-        do_sig2noise = False,
-        sig2noise_method = 'peak2mean',
-        sig2noise_mask = 2,
+        frame_a: np.ndarray,
+        frame_b: np.ndarray,
+        window_size: list,
+        overlap: list,
+        iterations: int,
+        current_iteration:int,
+        x_old: np.ndarray,
+        y_old: np.ndarray, 
+        u_old: np.ndarray, 
+        v_old: np.ndarray,
+        algorithm: str = 'Standard FFT Correlation',
+        normalize_intensity: bool = False,
+        normalized_correlation: bool = False,
+        correlation_method: str = "circular",
+        deformation_method: str = "second image",
+        interpolation_order1: int = 3,
+        interpolation_order2: int = 3,
+        interpolation_order3: int = 3,
+        weight: str = 'boxcar',
+        weight_sigma: int = 8,
+        disable_autocorrelation: bool = False,
+        autocorrelation_distance: list = [0,0],
+        limit_peak_search: bool = False,
+        limit_peak_search_distance: list = [0,0],
+        subpixel_method: str = "gaussian",
+        offset_correlation: bool = True,
+        do_sig2noise: bool = False,
+        sig2noise_method: str = 'peak2mean',
+        sig2noise_mask: int = 2,
         rfft2 = fft.rfft2,
         irfft2 = fft.irfft2,
         ):
@@ -1760,7 +1807,7 @@ class pivware():
                     x, y, u_pre, v_pre,
                     kx = interpolation_order3,
                     ky = interpolation_order3,
-                )
+                ) 
                 frame_a = scn.map_coordinates(
                     frame_a, ((y_new - vt / 2, x_new - ut / 2)),
                     order=interpolation_order2, 
@@ -1800,7 +1847,8 @@ class pivware():
             window_size, 
             overlap
         )
-        
+        if weight == 'gaussian':
+            weight = (weight, weight_sigma)
         weight_y = get_window(weight, aa.shape[-2])
         weight_x = get_window(weight, aa.shape[-1])
         weight = np.outer(weight_y, weight_x).astype('float32')
@@ -1828,8 +1876,8 @@ class pivware():
             corr = pivware.convolution(
                 aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
                 bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
-            ) / (aa.shape[1] * aa.std(axis = (-2,-1))[:, np.newaxis, np.newaxis] *
-                 aa.shape[2] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float16')
+            ) / (aa.shape[-2] * aa.std(axis = (-2,-1))[:, np.newaxis, np.newaxis] *
+                 aa.shape[-1] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float16')
         #elif algorithm.lower() == 'normalized fft correlation':
         #    corr = piv_prc.fft_correlate_images(
         #        aa,bb, 
@@ -2007,15 +2055,17 @@ class pivware():
                     s2[1] * image_b.std(axis = (-2,-1))[:, np.newaxis, np.newaxis])
             image_a -= image_a.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis]
             image_b -= image_b.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis]
+            offset = 100
         else:
             norm = 1
+            offset = 1
 
         if correlation_method == 'circular':
             f2a = conj(rfft2(image_a))
             f2b = rfft2(image_b)
-            r = np.sqrt(np.absolute(f2a) * np.absolute(f2b))
-            r = np.divide(f2a * f2b, r, where = (r != 0))
-            corr = fftshift(irfft2(r), axes=(-2, -1)).real * 100 # so it would be in range of float32
+            r = f2a * f2b
+            r = r/(np.sqrt(np.abs(r))+1e-5)
+            corr = fftshift(irfft2(r), axes=(-2, -1)).real 
         else:
             size = s1 + s2 - 1
             fsize = 2 ** np.ceil(np.log2(size)).astype(int)
@@ -2025,13 +2075,13 @@ class pivware():
             
             f2a = conj(rfft2(image_a, fsize, axes=(-2, -1)))
             f2b = rfft2(image_b, fsize, axes=(-2, -1))
-            r = np.sqrt(np.absolute(f2a) * np.absolute(f2b))
-            r = np.divide(f2a * f2b, r, where = (r != 0))
-            corr = fftshift(irfft2(r), axes=(-2, -1)).real[fslice] * 100
-        return corr / norm.astype('float32')
+            r = f2a * f2b
+            r = r/(np.sqrt(np.abs(r))+1e-5)
+            corr = fftshift(irfft2(r), axes=(-2, -1)).real[fslice]
+        return corr * offset / norm.astype('float32') # so it would be in range of float32
     
     
-    def convolution(aa, bb):
+    def convolution(aa: np.ndarray, bb: np.ndarray) -> np.ndarray:
         corrMat = []
         for i in range(aa.shape[0]):
             corr = convolve2d(aa[i,:,:], bb[i,::-1, ::-1], "full").astype('float32')
@@ -2039,21 +2089,19 @@ class pivware():
         return np.array(corrMat)
     
     
-    def remove_autocorrelation_peak(corr, distance = 1, offset = 0):
-        y, x = corr.shape[1:3]
-        if isinstance(distance, list) != True and isinstance(distance, list) != True: 
-            distance = [distance, distance]
-        meanCorr = np.nanmean(corr, axis = (-2,-1))[:, np.newaxis, np.newaxis]
-        corr[:, y//2 - distance[0] : y//2 + distance[0], x//2 - distance[1] : x//2 + distance[1]] = meanCorr
+    def remove_autocorrelation_peak(corr: np.ndarray, distance: list = [0,0]) -> np.ndarray:
+        if distance != [0,0]:
+            y, x = corr.shape[1:3]
+            meanCorr = np.nanmean(corr, axis = (-2,-1))[:, np.newaxis, np.newaxis]
+            corr[:, y//2 - distance[0] : y//2 + distance[0], x//2 - distance[1] : x//2 + distance[1]] = meanCorr
         return corr
     
     
-    def limit_peak_search_area(corr, distance = None):
+    def limit_peak_search_area(corr: np.ndarray, distance: list = [0,0]) -> np.ndarray:
         y, x = corr.shape[1:3]
-        if distance == None:
+        if distance == [0,0]:
             distance = [y // 4, x//4]
-        if isinstance(distance, list) != True and isinstance(distance, list) != True: 
-            distance = [distance, distance]
+            
         if distance[0] >= 2 or distance[1] >= 2:
             meanCorr = np.nanmean(corr, axis = (-2,-1))[:, np.newaxis, np.newaxis]
             corrNew = np.zeros(corr.shape) + meanCorr
@@ -2065,7 +2113,7 @@ class pivware():
         return corr    
     
     
-    def pearson_corr(frame_a, frame_b, window_size, overlap):
+    def pearson_corr(frame_a: np.ndarray, frame_b: np.ndarray, window_size: list, overlap: list) -> np.ndarray:
         aa = piv_prc.sliding_window_array(
             frame_a, 
             window_size, 
