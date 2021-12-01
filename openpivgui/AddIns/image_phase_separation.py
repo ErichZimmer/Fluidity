@@ -1,7 +1,7 @@
 from openpivgui.AddIns.AddIn import AddIn
 from openpiv.phase_separation import (opening_method, median_filter_method,
     khalitov_longmire, get_particles_size_array, get_size_brightness_map)
-
+import numpy as np
 class image_phase_separation(AddIn):
     """
         Blueprint for developing own methods and inserting own variables
