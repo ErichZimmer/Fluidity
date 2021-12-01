@@ -6,45 +6,33 @@ A Graphical User Interface (GUI), providing fast and efficient workflow for eval
 ## Warning
 This GUI was developed hastily for a PIV project and thus has many bugs. Additionally, the GUI may not be tailored to your needs as it has features that was found useful for an in-house PIV system. 
 
-## Usage
-
-1. Press »File« then »load images«. 
-Select some image pairs (Ctrl + Shift for multiple).
-
-2. Click on the links in the image list to view the imported 
-images and press »Apply frequencing« to load the images
-into the GUI.
-
-3. Walk through the drop-down-menues in »Pre-processing«
-and »Analysis« and edit the parameters.
-
-4. Calibrate your images or results with the »Calibration« 
-drop-down menu.
-       
-5. Press the »Analyze all frame(s)« butten to 
-start the processing chain. Analyzing the current frame 
-saves the correlation matix for further analysis.
-    
-6. Validate/modify your results with the »Post processing« 
-drop-down menu.
-    
-7. Inspect the results by clicking on the links in the frame-list
-on the right.
-Use the »Data exploration« drop-down menu for changing
-the plot parameters.
-
-8. Re-evaluate images if needed (results are automatically
-deleted) with new information/parameters.
-
-9. Export results in ASCI-II
+## Features
++ Works with a wide range of image types (RGB converted to grayscale using 0.299R 0.587B 0.144G)
++ Create movies (mp4, avi, non-optimized gif)
++ Process movies (converts to images)
++ Custom image frequencing
++ Extensive image pre-processing with batch image processing (saves as 8 bit images)
++ Interactive calibration
++ High precision processing using iterative image deformation
++ 3 subpixel estimators (gaussian, parabolic, centroid)
++ Ensemble correlation with iterative image deformation
++ Rectangular interrogation windows supported (25% slower)
++ Average all results (excluding ensemble correlation)
++ Parallel batch processing
++ Extensive post-processing
++ Import vectors for post-processing
++ Synthetic image generation
++ No proprietary environments
 
 [Example output](https://user-images.githubusercontent.com/69478071/140243359-f234c093-4ce6-49d5-ae61-f1bc684de042.mp4)
 
-## Documentation <a id=documentation></a>
+## Documentation 
 
 See wiki
 
 
-## Related
-
-Also check out [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui).
+## References
++ [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui) as a starting platform
++ [openpiv-python](https://github.com/OpenPIV/openpiv-python) as core processor
++ [PIVlab](https://github.com/Shrediquette/PIVlab) for synthetic image generation and auto scaling of vectors 
++ [Particle Image Velocimetry: A Practical Guide](10.1007/978-3-662-03637-2) got me started in PIV 
