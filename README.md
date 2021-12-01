@@ -6,7 +6,7 @@ A Graphical User Interface (GUI), providing fast and efficient workflow for eval
 ## Warning
 This GUI was developed hastily for a PIV project and thus has many bugs. Additionally, the GUI may not be tailored to your needs as it has features that was found useful for an in-house PIV system. 
 
-### Features
+## Features
 + Works with a wide range of image types (RGB converted to grayscale using 0.299R 0.587B 0.144G)
 + Create movies (mp4, avi, non-optimized gif)
 + Process movies (converts to images)
@@ -31,6 +31,8 @@ This GUI was developed hastily for a PIV project and thus has many bugs. Additio
 See wiki
 
 
-## Related
-
-Also check out [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui).
+## References
++ [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui) as a starting platform
++ [openpiv-python](https://github.com/OpenPIV/openpiv-python) as core processor
++ [PIVlab](https://github.com/Shrediquette/PIVlab) for synthetic image generation and auto scaling of vectors 
++ [Particle Image Velocimetry: A Practical Guide](10.1007/978-3-662-03637-2) got me started in PIV 
