@@ -35,4 +35,4 @@ See wiki
 + [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui) as a starting platform
 + [openpiv-python](https://github.com/OpenPIV/openpiv-python) as core processor
 + [PIVlab](https://github.com/Shrediquette/PIVlab) for synthetic image generation and auto scaling of vectors 
-+ [Particle Image Velocimetry: A Practical Guide](10.1007/978-3-662-03637-2) got me started in PIV 
++ [Particle Image Velocimetry: A Practical Guide](https://link.springer.com/book/10.1007/978-3-662-03637-2) got me started in PIV 
