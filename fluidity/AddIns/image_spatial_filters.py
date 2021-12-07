@@ -1,11 +1,11 @@
-from openpivgui.AddIns.AddIn import AddIn
-from openpivgui.open_piv_gui_tools import coords_to_xymask
-import numpy as np
-import openpiv.preprocess as piv_pre
+from fluidity.AddIns.AddIn import AddIn
+from fluidity.tools import coords_to_xymask
 from skimage import exposure, filters, util
 from scipy.ndimage.filters import gaussian_filter, median_filter
 from scipy.signal.signaltools import wiener as wiener_filter
 from skimage.measure import find_contours, approximate_polygon, points_in_poly
+import openpiv.preprocess as piv_pre
+import numpy as np
 
 class image_spatial_filters(AddIn):
     """

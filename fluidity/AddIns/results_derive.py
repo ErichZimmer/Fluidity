@@ -1,4 +1,4 @@
-from openpivgui.AddIns.AddIn import AddIn
+from fluidity.AddIns.AddIn import AddIn
 import openpiv.smoothn as piv_smt
 import numpy as np
 

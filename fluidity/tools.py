@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-''' Methods for reuse within the OpenPivGui project.'''
+''' Methods for reuse within the OpenPivGui/Fluidity project.'''
 from skimage.measure import points_in_poly, profile_line
 from matplotlib.collections import PatchCollection
 import matplotlib.patches as patches

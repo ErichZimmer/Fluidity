@@ -3,8 +3,7 @@
 
 '''A class for simple parameter handling.
 
-This class is also used as a basis for automated widget creation
-by OpenPivGui.
+This class is also used as a basis for automated widget creation for the GUI.
 '''
 
 import os
@@ -31,13 +30,13 @@ self.object_mask
 )
 '''
 
-class OpenPivParams():
+class Params():
     '''A class for convenient parameter handling.
 
     Widgets are automatically created based on the content of the
     variables in the dictionary OpenPivParams.default.
 
-    The entries in OpenPivParams.default are assumed to follow this
+    The entries in Params.default are assumed to follow this
     pattern:
 
     (str) key:
@@ -74,9 +73,9 @@ class OpenPivParams():
     def __init__(self):
         # hard coded location of the parameter file in the home dir:
         self.params_fname = os.path.expanduser('~' + os.sep +
-                                               'openpivgui_settings.json')
+                                               'fluidity_settings.json')
         self.session_file= os.path.expanduser(r'~' + os.sep +
-                                                 'openpivgui_session.hdf5')
+                                                 'fluidity_session.hdf5')
         # grouping and sorting based on an index:
         self.GENERAL = 1000
         self.PREPROC = 2000
@@ -637,7 +636,7 @@ class OpenPivParams():
             
             'image_interpolation_order':
                 [3153, 'sub_int', 1, (1, 2, 3, 4, 5),
-                 'image interpolation order',
+                 'dense predictor order',
                  'Interpolation order of the bivariate spline interpolator. \n' +
                  '»1« yields first order bi-linear interpolation \n'+
                  '»2« yields second order quadratic interpolation \n'+
@@ -727,8 +726,9 @@ class OpenPivParams():
                     #'hann',
                     'hamming',
                   ),
-                 'window weighting (experimental)',
-                 'Window weighting function applied to the interrogation windows.'],# and '+
+                 'window weighting',
+                 'Window weighting function applied to interrogation windows '+
+                 '(not the correlation matrix).'],# and '+
                  #'correlation matrix (multiplied by autocorrelation of weighting function).'],
             
             'window_weighting_sigma':
@@ -744,8 +744,8 @@ class OpenPivParams():
             
             'window_size_func':
                 [3197, 'sub_int', 32, None,
-                 'interrogation window [px]',
-                 'Interrogation window size in pixels.'],
+                 'plotting window [px]',
+                 'Plotting window size in pixels.'],
             
             'corr_stats_sub_h-frame':
                 [3200, 'sub_labelframe', None,
@@ -2051,30 +2051,30 @@ class OpenPivParams():
                  'Particle settings',
                  None],
             
-            'sig_sheet_thick':
-                [11641, 'sub_float', 0.25, None,
-                 'light sheet thickness [0-1]',
-                 'Depth of the simulated light sheet.'],
-            
-            'sig_part_Z':
-                [11642, 'sub_int', 20, None,
-                 'random z position [%]',
-                 'Random position of particles in light sheet.'],
-            
             'sig_part_num':
-                [11643, 'sub_int', 8000, None,
+                [11641, 'sub_int', 8000, None,
                  'number of particles',
                  'Number of particles in image.'],
             
             'sig_part_dia':
-                [11644, 'sub_float', 1.75, None,
+                [11642, 'sub_float', 1.75, None,
                  'particle diameter [px]',
                  'Diameter of the generated particles in pixels.'],
             
             'sig_part_dia_std':
-                [11645, 'sub_float', 0.25, None,
+                [11643, 'sub_float', 0.25, None,
                  'particle diameter std [px]',
                  'How much the diameter of the particle can deviate from in pixels.'],
+            
+            'sig_sheet_thick':
+                [11644, 'sub_float', 0.25, None,
+                 'particle brightness [0-1]',
+                 'Particle brightness.'],
+            
+            'sig_part_Z':
+                [11645, 'sub_int', 20, None,
+                 'brightness variation [%]',
+                 'How much the max intensity of the particles can vary.'],
             
             'sig_noise':
                 [11646, 'sub_float', 0.001, None,
@@ -2084,6 +2084,7 @@ class OpenPivParams():
             'sig_flow':
                 [11646, 'str', 'linear', (
                     'linear',
+                    'frequency',
                     #'parabolic',
                     'rankine vortex', 
                     #'lamb-oseen vortex', 
@@ -2106,6 +2107,11 @@ class OpenPivParams():
                 [11652, 'sub', '5', None,
                  'max y displacement [px]',
                  'Maximum y (v) displacement(s).'],
+            
+            'sig_linpar_freq':
+                [11653, 'sub_int', 100, None,
+                 'frequency [px]',
+                 'Frequency for spatial frequency flow.'],
             
             'sig_vortex':
                 [11660, 'sub_labelframe', None, 

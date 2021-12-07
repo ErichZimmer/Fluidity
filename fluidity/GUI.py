@@ -3,16 +3,16 @@
 
 '''A simple GUI for OpenPIV.'''
 
-import openpivgui.vec_plot as vec_plot
-from openpivgui.open_piv_gui_tools import (str2list, str2dict, get_dim, _round,
+import fluidity.vec_plot as vec_plot
+from fluidity.tools import (str2list, str2dict, get_dim, _round,
     add_disp_roi, add_disp_mask, save, get_selection, coords_to_xymask)
-from openpivgui.ErrorChecker import check_PIVprocessing, check_processing
-from openpivgui.AddIns import image_transformations, image_phase_separation, image_temporal_filters, image_spatial_filters
-import openpivgui.AddInHandler as AddInHandler
-from openpivgui.MultiProcessing import MultiProcessing
-from openpivgui.CreateToolTip import CreateToolTip
-from openpivgui.OpenPivParams import OpenPivParams
-from openpivgui.widget_lists import widget_list, button_list, disabled_widgets
+from fluidity.ErrorChecker import check_PIVprocessing, check_processing
+from fluidity.AddIns import image_transformations, image_phase_separation, image_temporal_filters, image_spatial_filters
+import fluidity.AddInHandler as AddInHandler
+from fluidity.MultiProcessing import MultiProcessing
+from fluidity.CreateToolTip import CreateToolTip
+from fluidity.Params import Params
+from fluidity.widget_lists import widget_list, button_list, disabled_widgets
 from openpiv.pyprocess import get_rect_coordinates
 from matplotlib.figure import Figure as Fig
 from matplotlib.backend_bases import key_press_handler
@@ -49,7 +49,7 @@ import sys
 import re
 import os
 
-__version__ = '0.0.8'
+__version__ = '0.0.9'
 
 __licence__ = '''
 This program is free software: you can redistribute it and/or modify
@@ -65,9 +65,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 __email__ = 'vennemann@fh-muenster.de'
+class SplashScreen(tk.Toplevel):
+    def __init__(self, parent):
+        tk.Toplevel.__init__(self, parent, width = 300, height = 300)
+        self.title('OpenPIV-Python GUI')
+        self.update()
 
-
-class OpenPivGui(tk.Tk):
+class GUI(tk.Tk):
     preprocessing_methods = {}
     postprocessing_methods = {}
     plotting_methods = {}
@@ -78,9 +82,10 @@ class OpenPivGui(tk.Tk):
         '''Standard initialization method.'''
         print('Initializing GUI')
         self.VERSION = __version__
-        self.openpivVersion = get_distribution('openpiv')
-        self.TITLE = f'OpenPIV-Python GUI | '
+        self.TITLE = f'Fluidity-2C | '
         tk.Tk.__init__(self)
+        #self.withdraw()
+        #splash = SplashScreen(self)
         self.path = os.path.dirname(
             os.path.abspath(__file__))  # path of gui folder
         self.icon_path = os.path.join(
@@ -91,7 +96,7 @@ class OpenPivGui(tk.Tk):
         # handle for user closing GUI through window manager
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         # the parameter object
-        self.p = OpenPivParams()
+        self.p = Params()
         AddInHandler.init_add_ins(self)
         self.toggled_widgets.update(widget_list())
         self.toggled_buttons += button_list()
@@ -154,14 +159,16 @@ class OpenPivGui(tk.Tk):
         self.background_frame_b = []
         self.predictor_filepath = ''
         self.calibration_matrix = []
+        #splash.destroy()
+        #self.deiconify()
         try:
             self.show(self.p['files_a'][0], preview = False, bypass = True)
         except: pass
         for widget in disabled_widgets():
             self.ttk_widgets[widget].config(state = 'disabled')
         self.log(timestamp=True, text='--------------------------------' +
-                                      '\nTkinter OpenPIV session started.')
-        self.log(text='OpenPivGui version: ' + self.VERSION)
+                                      '\nTkinter Fluidity session started.')
+        self.log(text='Fluidity-2C version: ' + self.VERSION)
         print('Initialized GUI, ready for processing')
         
     
@@ -953,7 +960,7 @@ class OpenPivGui(tk.Tk):
             else:
                 self.__init_entry(key)
 
-            # create widgets that are not in OpenPivParams
+            # create widgets that are not in Params class
             if self.p.index[key] == 2710:
                 self.__init_ROI()
             elif self.p.index[key] == 2723:
@@ -1319,15 +1326,28 @@ class OpenPivGui(tk.Tk):
                                  title='About',
                                  message=(
         f'''
-        OpenPIV GUI - A python GUI for time-resolved DPIV
+        Fluidity - A python GUI for time-resolved 2C-DPIV
         
-        OpenPIV version: {self.openpivVersion}
-        GUI version: {self.VERSION}
-        Originally devoloped by Prof. Peter Vennemann, 
-                    enhanced by Erich Zimmer
+        Originally developed by Prof. Peter Vennemann, 
+                enhanced by Erich Zimmer
+                
         Published under GNU GPL version 3 or greater
-        Original GUI web: https://github.com/OpenPIV/openpiv_tk_gui
-        Enhanced GUI web: https://github.com/ErichZimmer/openpiv-pyhton-gui
+        
+        Original GUI web: 
+                https://github.com/OpenPIV/openpiv_tk_gui
+                
+        Enhanced GUI web:
+                https://github.com/ErichZimmer/openpiv-pyhton-gui
+        
+        Package versions:
+        GUI version: {self.VERSION}
+        OpenPIV version: {get_distribution('openpiv')}
+        Numpy version: {get_distribution('numpy')}
+        Scipy version: {get_distribution('scipy')}
+        ImageIO version: {get_distribution('imageio')}
+        tiff-file version: {get_distribution('tifffile')}
+        
+        
        '''
                                  )
                              )
@@ -1421,7 +1441,7 @@ class OpenPivGui(tk.Tk):
             self.get_settings()
             f_a = self.p['files_a']
             f_b = self.p['files_b']
-            self.p = OpenPivParams()
+            self.p = Params()
             AddInHandler.init_add_ins(self)
             self.set_settings()
             
@@ -1541,6 +1561,7 @@ class OpenPivGui(tk.Tk):
                 img *= 255
                 img = img.astype('uint8')
                 piv_tls.imsave(outpath, img)
+                print(f'Saved image {ind}')
             
             print('Saved file path: ' + pathfile)
         
@@ -3964,14 +3985,14 @@ class OpenPivGui(tk.Tk):
             (default None)
         group : int
             Print group of parameters.
-            (e.g. OpenPivParams.PIVPROC)
+            (e.g. Params.PIVPROC)
         columninformation : list
             Print column information of the selected file.
 
         Example
         -------
         log(text='processing parameters:', 
-            group=OpenPivParams.POSTPROC)
+            group=Params.POSTPROC)
         '''
         if text is not None:
             self.ta[0].insert(tk.END, text + '\n')
@@ -4716,13 +4737,22 @@ class OpenPivGui(tk.Tk):
         return flow_u.astype('float32'), flow_v.astype('float32')
     
     
-    def gen_parabolic_flow_field(
-        self, size_x, size_y, velx = 5, vely = 5, 
+    def gen_freq_flow_field(
+        self, size_x, size_y, velx = 5, vely = 5, freq = 5,
     ):
-        flow_u = np.ones((size_x, size_y))
-        flow_v = flow_u.copy()
-        flow_u *= velx
-        flow_v *= vely
+        x, y = np.meshgrid(
+            np.arange(0, size_x),
+            np.arange(0, size_y)
+        )
+        
+        if velx != 0:
+            flow_u = velx*np.sin(2*np.pi*x/freq)
+        else: 
+            flow_u = np.zeros((size_x, size_y))
+        if velx != 0:
+            flow_v = vely*np.sin(2*np.pi*y/freq)
+        else: 
+            flow_v = np.zeros((size_x, size_y))
         return flow_u.astype('float32'), flow_v.astype('float32')
     
         
@@ -4851,7 +4881,7 @@ class OpenPivGui(tk.Tk):
             y_bound = [0,1]
 
             flow_type = self.p['sig_flow']
-            if flow_type in ['linear', 'parabolic']:
+            if flow_type in ['linear', 'parabolic', 'frequency']:
                 try:
                     v_x = [float(self.p['sig_linpar_x_disp'])]
                 except:
@@ -4897,7 +4927,22 @@ class OpenPivGui(tk.Tk):
                     except:
                         vely = v_y[0]
                     flow_u, flow_v = self.gen_linear_flow_field(
-                        image_size[0], image_size[1], velx = velx, vely = vely,
+                        image_size[0], image_size[1],
+                        velx = velx, vely = vely,
+                    )
+                elif flow_type == 'frequency':
+                    try:
+                        velx = v_x[ind]
+                    except:
+                        velx = v_x[0]
+                    try:
+                        vely = v_y[ind]
+                    except:
+                        vely = v_y[0]
+                    flow_u, flow_v = self.gen_freq_flow_field(
+                        image_size[0], image_size[1], 
+                        velx = velx, vely = vely, 
+                        freq = self.p['sig_linpar_freq']
                     )
                 else:
                     try:
@@ -5615,6 +5660,6 @@ class OpenPivGui(tk.Tk):
                                             # Could cause possible issue in the future.
 
 if __name__ == '__main__':
-    openPivGui = OpenPivGui()
-    openPivGui.geometry("1200x750") # a good starting size for the GUI
-    openPivGui.mainloop()
+    gui = GUI()
+    gui.geometry("1200x750") # a good starting size for the GUI
+    gui.mainloop()

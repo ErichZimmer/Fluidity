@@ -11,10 +11,10 @@ imported_add_ins = {}
 def init_add_ins(gui):
     """
         In this method, the parameters that are already part of the GUI
-        (loaded from OpenPIVParams) are extended by the parameters of
+        (loaded from Params) are extended by the parameters of
         the selected AddIns.
-    :param gui: active instance of the OpenPivGui class
-    :type gui: obj(OpenPivGui)
+    :param gui: active instance of the GUI class
+    :type gui: obj(GUI)
     :return:
     """
     # get the parameters which are already part of the gui
@@ -30,7 +30,7 @@ def init_add_ins(gui):
     # add-ins and reading out the variables of the class. These are then
     # appended to the parameter object.
     for add_in in add_ins_to_be_included:
-        add_in_file = importlib.import_module("openpivgui.AddIns." + add_in)
+        add_in_file = importlib.import_module("fluidity.AddIns." + add_in)
         add_in_instance = getattr(add_in_file, add_in)(gui)
         imported_add_ins.update({add_in: add_in_instance.get_variables()})
         parameters.add_parameters(add_in_instance.get_variables())

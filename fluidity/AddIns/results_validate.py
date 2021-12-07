@@ -1,4 +1,4 @@
-from openpivgui.AddIns.AddIn import AddIn
+from fluidity.AddIns.AddIn import AddIn
 import openpiv.filters as piv_flt
 import openpiv.validation as piv_vld
 import openpiv.tools as piv_tls

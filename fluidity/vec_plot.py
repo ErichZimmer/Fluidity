@@ -44,7 +44,7 @@ from matplotlib.figure import Figure
 from matplotlib.colors import LinearSegmentedColormap
 from skimage.measure import points_in_poly
 from openpiv.preprocess import prepare_mask_on_grid as grid_mask
-from openpivgui.open_piv_gui_tools import (coords_to_xymask, 
+from fluidity.tools import (coords_to_xymask, 
     add_disp_roi, add_disp_mask)
 
 # creating a custom rainbow colormap
@@ -150,60 +150,6 @@ def histogram(data, figure, quantity, bins, log_y):
     ax.hist(h_data, bins, label=quantity)
     ax.set_xlabel(xlabel)
     ax.set_ylabel('number of vectors')
-    ax.set_title(parameter['plot_title'])
-
-    
-def profiles(data, parameter, figure, orientation):
-    '''Plot velocity profiles.
-
-    Line plots of the velocity component specified.
-
-    Parameters
-    ----------
-    data : pandas.DataFrame
-        Data to plot.
-    fname : str
-        A filename containing vector data. 
-        (will be deprecated in later updates)
-    figure : matplotlib.figure.Figure 
-        An (empty) Figure object.
-    orientation : str 
-        horizontal: Plot v_y over x.
-        vertical: Plot v_x over y.
-    '''
-    for i in list(data.columns.values):
-        data[i] = data[i].astype(float)
-    data = data.to_numpy().astype(np.float)
-    
-    dim_x, dim_y = get_dim(data)
-    
-    p_data = []
-    
-    ax = figure.add_subplot(111)
-    
-    if orientation == 'horizontal':
-        xlabel = 'x position'
-        ylabel = 'y displacement'
-        
-        for i in range(0, dim_y, parameter['profiles_jump']):
-            p_data.append(data[dim_x*i:dim_x*(i+1),3])
-        #print(p_data[-1])
-        for p in p_data:
-            #print(len(p))
-            ax.plot(range(dim_x), p, '.-')
-            
-    elif orientation == 'vertical':
-        xlabel = 'y position'
-        ylabel = 'x displacement'
-        
-        for i in range(0, dim_x, parameter['profiles_jump']):
-            p_data.append(data[i::dim_x,2])
-            
-        for p in p_data:
-            ax.plot(range(dim_y), p, '.-') 
-            
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
     ax.set_title(parameter['plot_title'])
 
 

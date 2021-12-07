@@ -6,7 +6,7 @@ import os
 os.environ['OPENBLAS_NUM_THREADS'] = str(1)
 os.environ['MKL_NUM_THREADS'] = str(1)
 
-from openpivgui.open_piv_gui_tools import _round, coords_to_xymask, normalize_array
+from fluidity.tools import _round, coords_to_xymask, normalize_array
 
 import multiprocessing
 import numpy as np
@@ -481,7 +481,7 @@ class MultiProcessing(piv_tls.Multiprocesser):
             v = self.precomp_fp[3]
         else:
             limit_peak_search = False
-            peak_distance = None
+            peak_distance = [0,0]
             
             if self.parameter['limit_peak_search_each']:
                 limit_peak_search = True
@@ -1617,31 +1617,32 @@ class pivware():
                                        overlap)
         print(f'Generated grid ({_round(time.time() - start, 6)*1000} millisecond(s))') 
         
-        aa = piv_prc.sliding_window_array(
-            frame_a, 
-            window_size, 
-            overlap
-        )
-        bb = piv_prc.sliding_window_array(
-            frame_b, 
-            window_size,
-            overlap
-        )
+        if weight == 'gaussian':
+            weight = (weight, weight_sigma)
+            
+        weight_y = get_window(weight, window_size[-2])
+        weight_x = get_window(weight, window_size[-1])
+        weight = np.outer(weight_y, weight_x).astype('float32')
+        
+        if algorithm.lower() != 'direct convolution':
+            aa = piv_prc.sliding_window_array(
+                frame_a, 
+                window_size, 
+                overlap
+            )
+            bb = piv_prc.sliding_window_array(
+                frame_b, 
+                window_size,
+                overlap
+            )
+            aa = aa * weight[np.newaxis,:,:]
+            bb = bb * weight[np.newaxis,:,:]
 
         n_rows, n_cols = piv_prc.get_field_shape(
             frame_a.shape, 
             window_size, 
             overlap
         )
-        
-        if weight == 'gaussian':
-            weight = (weight, weight_sigma)
-            
-        weight_y = get_window(weight, aa.shape[-2])
-        weight_x = get_window(weight, aa.shape[-1])
-        weight = np.outer(weight_y, weight_x).astype('float32')
-        aa = aa * weight[np.newaxis,:,:]
-        bb = bb * weight[np.newaxis,:,:]
         
         start = time.time()
         if algorithm.lower() == 'minimum quadratic differences':
@@ -1661,10 +1662,11 @@ class pivware():
             )
         elif algorithm.lower() == 'direct convolution':
             corr = pivware.convolution(
-                aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
-                bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
-            ) / (aa.shape[1] * aa.std(axis = (-2,-1))[:, np.newaxis, np.newaxis] *
-                 aa.shape[2] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float16')
+                frame_a, frame_b,
+                window_size, overlap,
+                n_rows, n_cols,
+                weight,
+            ) 
         #elif algorithm.lower() == 'normalized fft correlation':
         #    corr = piv_prc.fft_correlate_images(
         #        aa,bb, 
@@ -1831,29 +1833,31 @@ class pivware():
         
             print(f'Deformed images ({_round(time.time() - start, 6)*1000} milliseconds)') 
         
-        aa = piv_prc.sliding_window_array(
-            frame_a, 
-            window_size, 
-            overlap
-        )
-        bb = piv_prc.sliding_window_array(
-            frame_b, 
-            window_size,
-            overlap
-        )
+        if weight == 'gaussian':
+            weight = (weight, weight_sigma)
+        weight_y = get_window(weight, window_size[-2])
+        weight_x = get_window(weight, window_size[-1])
+        weight = np.outer(weight_y, weight_x).astype('float32')
+        
+        if algorithm.lower() != 'direct convolution':
+            aa = piv_prc.sliding_window_array(
+                frame_a, 
+                window_size, 
+                overlap
+            )
+            bb = piv_prc.sliding_window_array(
+                frame_b, 
+                window_size,
+                overlap
+            )
+            aa = aa * weight[np.newaxis,:,:]
+            bb = bb * weight[np.newaxis,:,:]
         
         n_rows, n_cols = piv_prc.get_field_shape(
             frame_a.shape, 
             window_size, 
             overlap
         )
-        if weight == 'gaussian':
-            weight = (weight, weight_sigma)
-        weight_y = get_window(weight, aa.shape[-2])
-        weight_x = get_window(weight, aa.shape[-1])
-        weight = np.outer(weight_y, weight_x).astype('float32')
-        aa = aa * weight[np.newaxis,:,:]
-        bb = bb * weight[np.newaxis,:,:]
         
         start = time.time()
         if algorithm.lower() == 'minimum quadratic differences':
@@ -1874,10 +1878,12 @@ class pivware():
             )
         elif algorithm.lower() == 'direct convolution':
             corr = pivware.convolution(
-                aa - aa.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
-                bb - bb.mean(axis = (-2,-1))[:,np.newaxis, np.newaxis],
-            ) / (aa.shape[-2] * aa.std(axis = (-2,-1))[:, np.newaxis, np.newaxis] *
-                 aa.shape[-1] * bb.std(axis = (-2,-1))[:, np.newaxis, np.newaxis]).astype('float16')
+                frame_a, frame_b,
+                window_size, overlap,
+                n_rows, n_cols,
+                weight,
+            ) 
+             
         #elif algorithm.lower() == 'normalized fft correlation':
         #    corr = piv_prc.fft_correlate_images(
         #        aa,bb, 
@@ -2081,12 +2087,20 @@ class pivware():
         return corr * offset / norm.astype('float32') # so it would be in range of float32
     
     
-    def convolution(aa: np.ndarray, bb: np.ndarray) -> np.ndarray:
-        corrMat = []
-        for i in range(aa.shape[0]):
-            corr = convolve2d(aa[i,:,:], bb[i,::-1, ::-1], "full").astype('float32')
-            corrMat.append(corr)
-        return np.array(corrMat)
+    def convolution(
+        frame_a: np.ndarray, frame_b: np.ndarray,
+        window_size: list, overlap: list, 
+        rows: int, cols: int,
+        weight: np.ndarray
+    ) -> np.ndarray:
+        out = np.zeros((rows*cols, window_size[0], window_size[1]))
+        for i in range(rows):
+            for j in range(cols):
+                aa = None
+                bb = None
+                corr = convolve2d(aa[i,:,:], bb[i,::-1, ::-1], "full").astype('float32')
+                corrMat.append(corr)
+        return out
     
     
     def remove_autocorrelation_peak(corr: np.ndarray, distance: list = [0,0]) -> np.ndarray:

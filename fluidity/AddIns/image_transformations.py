@@ -1,4 +1,4 @@
-from openpivgui.AddIns.AddIn import AddIn
+from fluidity.AddIns.AddIn import AddIn
 from openpiv.preprocess import offset_image
 from skimage import transform as tf
 from matplotlib.transforms import Affine2D

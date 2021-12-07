@@ -1,4 +1,4 @@
-from openpivgui.AddIns.AddIn import AddIn
+from fluidity.AddIns.AddIn import AddIn
 from openpiv.tools import imread
 from scipy.ndimage.filters import gaussian_filter
 import numpy as np
