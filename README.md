@@ -30,6 +30,18 @@ This GUI was developed hastily for a PIV project and thus has many bugs. Additio
 
 See wiki
 
+## To-do list
+- [ ] second peak search
+- [ ] nxn 2D subpixel estimator
+- [ ] direct correlation for limited search area
+- [ ] precomputed dense predictor for first pass
+- [ ] temporal background removal
+- [ ] Uncertainty quantification
+- [ ] proper orthogonal decomposition
+- [ ] image rectification (calibration)
+- [ ] pressure estimation
+- [ ] Add stereo or other 3D processing options (maybe a new GUI for this too)
+- [ ] do all PIV processing in c (including parallel)
 
 ## References
 + [openpiv_tk_gui](https://github.com/OpenPIV/openpiv_tk_gui) as a starting platform
